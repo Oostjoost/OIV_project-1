@@ -90,7 +90,7 @@ class oivObjectWidget(QDockWidget, FORM_CLASS):
         foreignKey = 'identificatie'
         request = QgsFeatureRequest().setFilterExpression(foreignKey + " = '" + str(objectId) + "'")
         tempFeature = next(ilayer.getFeatures(request))
-        bagGebruiksdoel = str(tempFeature['gebruiksdoel'])
+        bagGebruiksdoel = tempFeature['gebruiksdoel']
         if self.adres_1.text() == "":
             bag_adres1, bag_adres2, bag_gebruiksdoel = ask_bag_adress(objectId, bagGebruiksdoel)
             self.adres_1.setText(bag_adres1)
