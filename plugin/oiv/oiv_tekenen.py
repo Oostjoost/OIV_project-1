@@ -63,6 +63,8 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         self.stackwidget = oivStackWidget()
         self.lengte_label.setVisible(False)
         self.lengte.setVisible(False)
+        self.straal_label.setVisible(False)
+        self.straal.setVisible(False)        
         self.oppervlakte_label.setVisible(False)
         self.oppervlakte.setVisible(False)        
         self.move.clicked.connect(self.run_move_point)
@@ -223,6 +225,8 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
             self.canvas.setMapTool(self.tekenTool)
             self.lengte_label.setVisible(False)
             self.lengte.setVisible(False)
+            self.straal.setVisible(False)
+            self.straal_label.setVisible(False)
             self.oppervlakte_label.setVisible(False)
             self.oppervlakte.setVisible(False) 
             #na de mapTool terugkeren naar "place_feature"
@@ -236,6 +240,8 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
             self.canvas.setMapTool(self.lineTool)
             self.lengte_label.setVisible(True)
             self.lengte.setVisible(True)
+            self.straal.setVisible(True)
+            self.straal_label.setVisible(True)            
             self.oppervlakte_label.setVisible(False)
             self.oppervlakte.setVisible(False) 
             self.lineTool.parent = self  
@@ -248,6 +254,8 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
             self.canvas.setMapTool(self.polygonTool)
             self.lengte_label.setVisible(True)
             self.lengte.setVisible(True)
+            self.straal.setVisible(True)
+            self.straal_label.setVisible(True)             
             self.oppervlakte_label.setVisible(True)
             self.oppervlakte.setVisible(True)
             self.polygonTool.parent = self
