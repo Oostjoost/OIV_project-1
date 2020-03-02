@@ -62,7 +62,7 @@ class oivImportFileWidget(QDockWidget, FORM_CLASS):
         else:
             importFileFeat = importFile
         self.importLayer = QgsVectorLayer(importFileFeat,"import","ogr")
-        QgsProject.instance().addMapLayer(self.importLayer, True)
+        QgsProject.instance().addMapLayer(self.importLayer, False)
         fields = self.importLayer.fields()   
         for field in fields:
             self.type.addItem(field.name())
@@ -104,8 +104,7 @@ class oivImportFileWidget(QDockWidget, FORM_CLASS):
     def check_importlayer(self):
         checks = [None,None]
         message = ''
-        self.iface.setActiveLayer(self.importLayer)
-        crsCheck = self.iface.activeLayer().crs().authid()
+        crsCheck = self.importLayer.crs().authid()
         if crsCheck == 'EPSG:28992':
             checks[0] = 'RD'
         if self.import_laag.currentText() == "Bouwkundige veiligheidsvoorzieningen":
@@ -218,16 +217,16 @@ class oivImportFileWidget(QDockWidget, FORM_CLASS):
     def set_parent_id(self, ilayer, ifeature):
         if ilayer.name() == 'Bouwlagen':
             self.bouwlaag_id.setText(str(ifeature["id"]))
+            self.selectTool.geomSelected.disconnect(self.set_parent_id)
+            self.label3.setVisible(True)
+            self.label4.setVisible(True)
+            self.label5a.setVisible(True)
+            self.label5b.setVisible(True)
+            self.import_laag.setVisible(True)
+            self.check.setVisible(True)
+            self.type.setVisible(True)            
         else:
             self.run_select_bouwlaag()
-        self.selectTool.geomSelected.disconnect(self.set_parent_id)
-        self.label3.setVisible(True)
-        self.label4.setVisible(True)
-        self.label5a.setVisible(True)
-        self.label5b.setVisible(True)
-        self.import_laag.setVisible(True)
-        self.check.setVisible(True)
-        self.type.setVisible(True)
 
     def hide_all(self):
         self.check.setVisible(False)

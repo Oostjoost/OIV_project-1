@@ -52,7 +52,7 @@ class CaptureTool(QgsMapTool):
             self.stopCapturing()
             if points != None:
                 self.geometryCaptured(points)     
-
+  
     #acties gekoppeld aan het bewegen van de muis
     def canvasMoveEvent(self, event):
         #converteer de muislocatie naar laag en scherm coordinaten
