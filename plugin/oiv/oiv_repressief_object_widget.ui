@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>641</width>
-    <height>800</height>
+    <width>380</width>
+    <height>576</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -34,8 +34,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>617</width>
-         <height>750</height>
+         <width>360</width>
+         <height>534</height>
         </rect>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout">
@@ -115,24 +115,28 @@ border-color: rgba(255, 255, 255, 0);</string>
            </widget>
           </item>
           <item>
+           <widget class="QLabel" name="straal_label">
+            <property name="text">
+             <string>Straal hulpcirkel</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="straal">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>1000</number>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QPushButton" name="objectgegevens">
             <property name="text">
              <string>Objectgegevens bewerken</string>
             </property>
            </widget>
-          </item>
-          <item>
-           <spacer name="verticalSpacer_3">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>20</width>
-              <height>40</height>
-             </size>
-            </property>
-           </spacer>
           </item>
           <item>
            <widget class="QPushButton" name="object_tekenen">
@@ -154,19 +158,6 @@ border-color: rgba(255, 255, 255, 0);</string>
              <string>Object verwijderen</string>
             </property>
            </widget>
-          </item>
-          <item>
-           <spacer name="verticalSpacer_4">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>20</width>
-              <height>40</height>
-             </size>
-            </property>
-           </spacer>
           </item>
           <item>
            <widget class="QPushButton" name="terugmelden">

@@ -47,8 +47,6 @@ class SelectTool(QgsMapToolIdentify, QgsMapTool):
 
     def ask_user_for_feature(self, idLayer, allFeatures):
         targetFeature = None
-        print(idLayer.name())
-        print(self.read_config)
         type_layer_name = get_draw_layer_attr(idLayer.name(), "type_layer_name", self.read_config)
         attr_id = get_draw_layer_attr(idLayer.name(), "identifier", self.read_config)
         sortList = []

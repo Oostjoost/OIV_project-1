@@ -52,7 +52,7 @@ class CaptureTool(QgsMapTool):
             self.stopCapturing()
             if points != None:
                 self.geometryCaptured(points)     
-
+  
     #acties gekoppeld aan het bewegen van de muis
     def canvasMoveEvent(self, event):
         #converteer de muislocatie naar laag en scherm coordinaten
@@ -239,7 +239,7 @@ class CaptureTool(QgsMapTool):
     def startCapturing(self):
         #rubberband voor de al vastgelegde punten
         color = QColor("red")
-        color.setAlphaF(0.78)
+        color.setAlphaF(0.2)
         self.rubberBand = QgsRubberBand(self.canvas, self.bandType())
         self.rubberBand.setWidth(2)
         self.rubberBand.setColor(color)
@@ -254,16 +254,28 @@ class CaptureTool(QgsMapTool):
 
         #2x loodrechte hulp tekenlijnen
         self.perpRubberBand = QgsRubberBand(self.canvas, QgsWkbTypes.LineGeometry)
-        self.perpRubberBand.setWidth(2)
+        self.perpRubberBand.setWidth(1)
         self.perpRubberBand.setColor(QColor("blue"))
         self.perpRubberBand.setLineStyle(Qt.DotLine)
         self.perpRubberBand.show()
 
         self.perpRubberBand2 = QgsRubberBand(self.canvas, QgsWkbTypes.LineGeometry)
-        self.perpRubberBand2.setWidth(2)
+        self.perpRubberBand2.setWidth(1)
         self.perpRubberBand2.setColor(QColor("blue"))
         self.perpRubberBand2.setLineStyle(Qt.DotLine)
         self.perpRubberBand2.show()
+        
+        self.roundRubberBand = QgsRubberBand(self.canvas, QgsWkbTypes.LineGeometry)
+        self.roundRubberBand.setWidth(1)
+        borderColor = QColor("blue")
+        borderColor.setAlphaF(0.5)
+        fillColor = QColor("blue")
+        fillColor.setAlphaF(0)
+        self.roundRubberBand.setFillColor(fillColor)    
+        self.roundRubberBand.setStrokeColor(borderColor)        
+        self.roundRubberBand.setLineStyle(Qt.DotLine)
+        self.roundRubberBand.show() 
+        self.parent.straal.valueChanged.connect(self.roundrubberband_change_straal)        
         self.capturing = True
 
     #bepaal het type rubberband (polygoon of line)
@@ -281,6 +293,15 @@ class CaptureTool(QgsMapTool):
         if self.tempRubberBand:
             self.canvas.scene().removeItem(self.tempRubberBand)
             self.tempRubberBand = None
+        if self.roundRubberBand:
+            self.canvas.scene().removeItem(self.roundRubberBand)
+            self.roundRubberBand = None
+        if self.perpRubberBand:
+            self.canvas.scene().removeItem(self.perpRubberBand)
+            self.perpRubberBand = None
+        if self.perpRubberBand2:
+            self.canvas.scene().removeItem(self.perpRubberBand2)
+            self.perpRubberBand2 = None              
         self.vertexmarker.hide()
         self.capturing = False
         self.capturedPoints = []
@@ -334,6 +355,14 @@ class CaptureTool(QgsMapTool):
             lastPt    = self.rubberBand.getPoint(0, bandSize-1)
             self.draw_perpendicularBand(lastPt, snapAngle)
 
+    def roundrubberband_change_straal(self):
+        straal = self.parent.straal.value()
+        startPt = self.capturedPoints[-1]
+        test = QgsCircle(QgsPoint(startPt), straal)
+        geom_cString = test.toCircularString()
+        geom_from_curve = QgsGeometry(geom_cString)
+        self.roundRubberBand.setToGeometry(geom_from_curve)        
+
     def draw_perpendicularBand(self, startPt, angle):
         #bereken de haakse lijnen op basis van de gesnapte feature
         length = 100
@@ -341,6 +370,13 @@ class CaptureTool(QgsMapTool):
         y1 = startPt.y() + length * cos(radians(angle))
         x2 = startPt.x() + length * sin(radians(angle + 180))
         y2 = startPt.y() + length * cos(radians(angle + 180))
+        straal = self.parent.straal.value()
+        test = QgsCircle(QgsPoint(startPt), straal)
+        geom_cString = test.toCircularString()
+        geom_from_curve = QgsGeometry(geom_cString)
+        self.roundRubberBand.setToGeometry(geom_from_curve)
+        self.snapLayer.append(self.roundRubberBand)
+        #self.roundRubberBand.setToGeometry(geom_cString)
         self.perpRubberBand.addPoint(QgsPointXY(x1,y1))
         self.perpRubberBand.addPoint(QgsPointXY(x2,y2))
         self.perpRubberBand.show()
