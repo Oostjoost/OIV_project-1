@@ -11,6 +11,7 @@ def formOpen(dialog, layer, feature):
         nameField.append(myDialog.findChild(QLineEdit, "hoeveelheid"))
         nameField.append(myDialog.findChild(QLineEdit, "omschrijving"))
         nameField.append(myDialog.findChild(QComboBox, "gevaarlijkestof_vnnr_id"))
+        nameField[2].setCurrentText('geen vn nummer')
         nameField.append(myDialog.findChild(QComboBox, "eenheid"))
         nameField.append(myDialog.findChild(QComboBox, "toestand"))
         okButton = dialog.findChild(QDialogButtonBox, "buttonBox")
@@ -23,7 +24,7 @@ def formOpen(dialog, layer, feature):
         if not (len(nameField[0].text()) > 0):
             nameField[0].setStyleSheet("background-color: rgba(255, 107, 107, 150);")
             okButton.setEnabled(False)
-        if not (len(nameField[1].text()) > 0 or len(nameField[2].currentText()) > 0):
+        if not (len(nameField[1].text()) > 0 or nameField[2].currentText() != ' geen vn nummer'):
             nameField[1].setStyleSheet("background-color: rgba(255, 107, 107, 150);")
             nameField[2].setStyleSheet("background-color: rgba(255, 107, 107, 150);")	
             okButton.setEnabled(False)			
@@ -53,7 +54,7 @@ def validate_0(nameField, nameValidate, okButton):
             okButton.setEnabled(True)
 
 def validate_1(nameField, nameValidate, okButton):
-    if not (len(nameField[1].text()) > 0 or len(nameField[2].currentText()) > 0):
+    if not (len(nameField[1].text()) > 0 or nameField[2].currentText() != ' geen vn nummer'):
         nameValidate[1] = 0
         nameField[1].setStyleSheet("background-color: rgba(255, 107, 107, 150);")
         nameField[2].setStyleSheet("background-color: rgba(255, 107, 107, 150);")

@@ -205,53 +205,61 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
             QMessageBox.information(None, "Gereed!", "Alle bouwlagen zijn succesvol aangemaakt!")
             
     def copy_bag_bouwlaag(self, ilayer, ifeature):
-        childFeature = QgsFeature()
-        layerName = 'Bouwlagen'
-        #get active floor from dockwidget
-        minBouwlaag = int(self.bouwlaag_min.text())
-        maxBouwlaag = int(self.bouwlaag_max.text())
-        layer = getlayer_byname(layerName)
-        #get necessary attributes from config file
-        question = get_draw_layer_attr(layerName, "question", self.read_config)
-        label_req = get_draw_layer_attr(layerName, "label_required", self.read_config)        
-        #get bouwdeel from user
-        input_label = user_input_label(label_req, question)
-        attr_fk = get_draw_layer_attr(layerName, "foreign_key", self.read_config)
-        attr_label = get_draw_layer_attr(layerName, "input_label", self.read_config)
-        self.iface.setActiveLayer(layer)
-        #construct QgsFeature to save
-        for i in range(minBouwlaag, maxBouwlaag + 1):
-            if i != 0:
-                childFeature.setGeometry(ifeature.geometry())
-                fields = layer.fields()        
-                childFeature.initAttributes(fields.count())
-                childFeature.setFields(fields)
-                childFeature[attr_fk] = self.objectId
-                childFeature[attr_label] = input_label
-                childFeature["bouwlaag"] = i
-                newFeatureId = write_layer(layer, childFeature)
-                #copy also the selected layers
-                if ilayer.name() == "Bouwlagen":
-                    self.copy_selected_layers(ifeature, newFeatureId, i)  
-                #block the signals of changing the comboBox to add the new floor
-                self.bouwlaag.blockSignals(True)
-                self.bouwlaag.clear()        
-                if i not in self.bouwlaagList:
-                    self.bouwlaagList.append(i)
-        self.bouwlaagList.sort()
-        self.bouwlagen_to_combobox()           
-        self.bouwlaag.blockSignals(False)
-        self.iface.actionPan().trigger()
-        #set all layers substring to the right floor
-        sub_string = "bouwlaag = " + str(minBouwlaag)
-        set_layer_substring(self.read_config, sub_string)
-        try:
-        	self.selectTool.geomSelected.disconnect()
-        except:
-        	None
-        if maxBouwlaag >= minBouwlaag:
-            QMessageBox.information(None, "Gereed!", "Alle bouwlagen zijn succesvol aangemaakt!")
-    
+        if ilayer.name() == 'Bouwlagen':
+            childFeature = QgsFeature()
+            layerName = 'Bouwlagen'
+            #get active floor from dockwidget
+            minBouwlaag = int(self.bouwlaag_min.text())
+            maxBouwlaag = int(self.bouwlaag_max.text())
+            layer = getlayer_byname(layerName)
+            #get necessary attributes from config file
+            question = get_draw_layer_attr(layerName, "question", self.read_config)
+            label_req = get_draw_layer_attr(layerName, "label_required", self.read_config)        
+            #get bouwdeel from user
+            input_label = user_input_label(label_req, question)
+            attr_fk = get_draw_layer_attr(layerName, "foreign_key", self.read_config)
+            attr_label = get_draw_layer_attr(layerName, "input_label", self.read_config)
+            self.iface.setActiveLayer(layer)
+            #construct QgsFeature to save
+            for i in range(minBouwlaag, maxBouwlaag + 1):
+                if i != 0:
+                    childFeature.setGeometry(ifeature.geometry())
+                    fields = layer.fields()        
+                    childFeature.initAttributes(fields.count())
+                    childFeature.setFields(fields)
+                    childFeature[attr_fk] = self.objectId
+                    childFeature[attr_label] = input_label
+                    childFeature["bouwlaag"] = i
+                    newFeatureId = write_layer(layer, childFeature)
+                    #copy also the selected layers
+                    if ilayer.name() == "Bouwlagen":
+                        self.copy_selected_layers(ifeature, newFeatureId, i)  
+                    #block the signals of changing the comboBox to add the new floor
+                    self.bouwlaag.blockSignals(True)
+                    self.bouwlaag.clear()        
+                    if i not in self.bouwlaagList:
+                        self.bouwlaagList.append(i)
+            self.bouwlaagList.sort()
+            self.bouwlagen_to_combobox()           
+            self.bouwlaag.blockSignals(False)
+            self.iface.actionPan().trigger()
+            #set all layers substring to the right floor
+            sub_string = "bouwlaag = " + str(minBouwlaag)
+            set_layer_substring(self.read_config, sub_string)
+            try:
+                self.selectTool.geomSelected.disconnect()
+            except:
+                None
+            if maxBouwlaag >= minBouwlaag:
+                QMessageBox.information(None, "Gereed!", "Alle bouwlagen zijn succesvol aangemaakt!")
+        else:
+            QMessageBox.information(None, "Oeps:", "U heeft geen bouwlaag aangeklikt, selecteer opnieuw.")
+            try:
+                self.selectTool.geomSelected.disconnect()
+            except:
+                None
+            self.selectTool.geomSelected.connect(self.copy_bag_bouwlaag)
+            
     #add existing floors to the comboBox of the "bouwlaagdockwidget"
     def bouwlagen_to_combobox(self):
         self.bouwlaag.blockSignals(True)    
