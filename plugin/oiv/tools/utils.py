@@ -1,51 +1,53 @@
-from qgis.core import *
-from qgis.gui import *
-from qgis.PyQt.QtWidgets import QInputDialog, QLineEdit, QMessageBox
+"""utils that are requested from the core plugin"""
+from qgis.core import QgsProject, QgsWkbTypes, QgsSpatialIndex, QgsFeatureRequest
+from qgis.PyQt.QtWidgets import QInputDialog, QLineEdit
 
-import os
-
-#get QgsLayer by name
 def getlayer_byname(layername):
+    """get QgsLayer by name"""
     layer = None
     layers = QgsProject.instance().mapLayersByName(layername)
     layer = layers[0]
-    return (layer)
+    return layer
 
 def user_input_label(label_req, question):
+    """communiceer met de gebruiker voor input, waarbij question de vraag is die wordt gesteld"""
     label = ''
     qid = QInputDialog()
-    #communiceer met de gebruiker voor input, waarbij question de vraag is die wordt gesteld
     if label_req < '2':
         while True:
             label, ok = QInputDialog.getText(qid, "Label:", question, QLineEdit.Normal,)
             if ok:
                 if label != '' or label_req == '0':
                     return label
-                    break
             else:
                 label = 'Cancel'
                 return label
-                break
+    else:
+        return label
 
-#derivation of layer type
 def check_layer_type(layer):
+    """derivation of layer type"""
+    layerType = None
     if layer.geometryType() == QgsWkbTypes.PointGeometry:
-        return "Point"
+        layerType = "Point"
     elif layer.geometryType() == QgsWkbTypes.LineGeometry:
-        return "Line"
+        layerType = "Line"
     elif layer.geometryType() == QgsWkbTypes.PolygonGeometry:
-        return "Polygon"
+        layerType = "Polygon"
+    else:
+        layerType = "undefined"
+    return layerType
 
-#write the attributes to layer
 def write_layer(layer, childFeature):
+    """write the attributes to layer"""
     layer.startEditing()
-    result, newFeatures = layer.dataProvider().addFeatures([childFeature])
+    dummy, newFeatures = layer.dataProvider().addFeatures([childFeature])
     layer.commitChanges()
     layer.triggerRepaint()
     return newFeatures[0].id()
 
-#search the nearest parent feature id
 def nearest_neighbor(iface, layer, point):
+    """search the nearest parent feature id"""
     index = None
     parentId = None
     parentFeature = None
@@ -55,20 +57,20 @@ def nearest_neighbor(iface, layer, point):
     try:
         parentId = index.nearestNeighbor(point, 1)[0]
         parentFeature = next(layer.getFeatures(QgsFeatureRequest(parentId)))
-    except:
+    except: # pylint: disable=bare-except
         parentId = None
     return parentFeature, parentId
 
-#get feature from specific id    
 def request_feature(ifeature, layer_feature_id, layer_name):
+    """get feature from specific id"""
     objectId = ifeature[layer_feature_id]
-    request = QgsFeatureRequest().setFilterExpression( '"id" = ' + str(objectId))
+    request = QgsFeatureRequest().setFilterExpression('"id" = ' + str(objectId))
     tempLayer = getlayer_byname(layer_name)
     tempFeature = next(tempLayer.getFeatures(request))
     return tempFeature, objectId
 
-#create unique sorted dropdown list
 def create_unique_sorted_list(sortList):
+    """create unique sorted dropdown list"""
     output = []
     for x in sortList:
         if x not in output:
@@ -76,23 +78,25 @@ def create_unique_sorted_list(sortList):
     output.sort()
     return output
 
-#get attribute value out of config file related to header(q_string)
-def get_draw_layer_attr(run_layer, q_string, read_config):
-    myList = []
-    answer = ''
-    myList = read_config[0]
-    attr_y = myList.index(q_string)
-    for i in range(len(read_config)):
-        if read_config[i][0] == run_layer:
-            answer = read_config[i][attr_y]
-    return answer
+def get_draw_layer_attr(runLayerName, qString, readConfig):
+    """get attribute value out of config file related to header(q_string)"""
+    headerCsv = []
+    result = ''
+    headerCsv = readConfig[0]
+    attrY = headerCsv.index(qString)
+    for line in readConfig:
+        if line[0] == runLayerName:
+            result = line[attrY]
+    return result
 
-#set layer subset according (you can check the subset under properties of the layer)
-def set_layer_substring(read_config, sub_string):
-    for i in range(1, len(read_config)):
-        layer = getlayer_byname(read_config[i][0])
-        layer.setSubsetString(sub_string)
+def set_layer_substring(readConfig, subString):
+    """set layer subset according (you can check the subset under properties of the layer)"""
+    next(readConfig)
+    for line in readConfig:
+        layer = getlayer_byname(line[0])
+        layer.setSubsetString(subString)
 
 def refresh_layers(iface):
+    """refresh all layers on the canvas"""
     for layer in iface.mapCanvas().layers():
         layer.triggerRepaint()

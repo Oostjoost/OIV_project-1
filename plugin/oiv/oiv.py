@@ -85,9 +85,9 @@ class oiv:
         #add label to toolbar
         self.label = QLabel(self.iface.mainWindow())
         self.labelAction = self.toolbar.addWidget(self.label)
-        self.label.setText("OIV 3.0.7 | Actieve bouwlaag: ")
+        self.label.setText("OIV 3.0.8 | Actieve bouwlaag: ")
         #init dropdown to switch floors
-        self.projCombo = QComboBox(self.iface.mainWindow())       
+        self.projCombo = QComboBox(self.iface.mainWindow())
         for i in range(self.max_bouwlaag - self.min_bouwlaag + 1):
             if self.max_bouwlaag - i != 0:
                 if self.max_bouwlaag - i == 1:

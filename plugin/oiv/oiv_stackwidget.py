@@ -23,15 +23,15 @@
 import os
 from qgis.PyQt import uic
 from qgis.PyQt.QtWidgets import QDockWidget
-from qgis.gui import *
-from qgis.core import *
+from qgis.gui import QgsAttributeEditorContext, QgsAttributeForm
+from qgis.core import QgsFeatureRequest
 from qgis.utils import iface
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'oiv_stackwidget.ui'))
 
 class oivStackWidget(QDockWidget, FORM_CLASS):
-
+    """open any feature form as stackwidget in OOIV pluging"""
     attributeForm = None
     parentWidget = None
 
@@ -41,8 +41,8 @@ class oivStackWidget(QDockWidget, FORM_CLASS):
         self.iface = iface
         self.setupUi(self)
 
-    #open feature form based on clicked object on the canvas
     def open_feature_form(self, ilayer, ifeature):
+        """"open feature form based on clicked object on the canvas"""
         ilayer.startEditing()
         context = QgsAttributeEditorContext()
         context.setVectorLayerTools(self.iface.vectorLayerTools())        
@@ -52,8 +52,8 @@ class oivStackWidget(QDockWidget, FORM_CLASS):
         self.iface.setActiveLayer(ilayer)        
         self.terug.clicked.connect(lambda: self.close_stacked(ilayer, ifeature))
 
-    #close feature form and save changes
     def close_stacked(self, ilayer, ifeature):
+        """close feature form and save changes"""
         self.attributeForm.save()
         self.terug.clicked.disconnect()
         ilayer.commitChanges()
@@ -61,13 +61,14 @@ class oivStackWidget(QDockWidget, FORM_CLASS):
         del self.attributeForm
         self.attributeForm = None
         if ilayer.name() == "Objecten":
-            request = QgsFeatureRequest().setFilterExpression("id = " + str(ifeature["id"]))
-            self.objectFeature = next(ilayer.getFeatures(request))
-            self.parentWidget.formelenaam.setText(self.objectFeature["formelenaam"])
+            request = QgsFeatureRequest().setFilterExpression("id = " \
+                             + str(ifeature["id"]))
+            objectFeature = next(ilayer.getFeatures(request))
+            self.parentWidget.formelenaam.setText(objectFeature["formelenaam"])
         self.close()
         try:
             self.parentWidget.show()
             self.iface.actionPan().trigger()
-        except:
-            None
-        del self  
+        except: # pylint: disable=bare-except
+            pass
+        del self
