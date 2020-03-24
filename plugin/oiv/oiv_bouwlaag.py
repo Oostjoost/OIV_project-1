@@ -205,7 +205,7 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
             QMessageBox.information(None, "Gereed!", "Alle bouwlagen zijn succesvol aangemaakt!")
             
     def copy_bag_bouwlaag(self, ilayer, ifeature):
-        if ilayer.name() == 'Bouwlagen' or ilayer.name() == 'BAG Panden':
+        if ilayer.name() == 'Bouwlagen' or ilayer.name() == 'BAG panden':
             childFeature = QgsFeature()
             layerName = 'Bouwlagen'
             #get active floor from dockwidget
