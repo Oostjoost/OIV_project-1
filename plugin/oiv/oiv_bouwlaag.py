@@ -20,43 +20,47 @@
  *                                                                         *
  ***************************************************************************/
 """
-
 import os
-from . import resources
+
 from qgis.PyQt import uic
+from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import QDockWidget, QCheckBox, QMessageBox
+
 from qgis.utils import iface
-from qgis.gui import *
-from qgis.core import *
+from qgis.core import QgsFeature, QgsGeometry, QgsFeatureRequest
+
 from .tools.identifyTool import SelectTool
-from .tools.utils import *
+from .tools.utils import getlayer_byname, get_draw_layer_attr, write_layer, set_layer_substring, user_input_label
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'oiv_bouwlaag_widget.ui'))
 
 class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
+    """create bouwlaag from BAG, copy or draw"""
 
-    canvas      = None
-    iface       = None
-    layer       = None
+    canvas = None
+    iface = None
+    layer = None
     read_config = None
-    selectTool  = None
+    selectTool = None
     polygonTool = None
-    objectId    = None
-    objectwidget   = None
-    bouwlaagList   = []
+    objectId = None
+    objectwidget = None
+    bouwlaagList = []
     snapLayerNames = ["Bouwlagen", "BAG panden", "Bouwkundige veiligheidsvoorzieningen", "Ruimten"]
 
-    #initialize dockwidget and connect slots and signals
     def __init__(self, parent=None):
+        """initialize dockwidget and connect slots and signals"""
         super(oivBouwlaagWidget, self).__init__(parent)
         self.setupUi(self)
         self.iface = iface
+
         self.bouwlaag_bag.clicked.connect(self.run_bag_overnemen)
         self.bouwlaag_tekenen.clicked.connect(self.run_bouwlaag_tekenen)
         self.bouwlaag_overnemen.clicked.connect(self.run_bouwlaag_overnemen)
         self.terug.clicked.connect(self.close_bouwlaag)
-        self.copy.clicked.connect(self.run_select_bouwlaag) 
+        self.copy.clicked.connect(self.run_select_bouwlaag)
+
         self.label1.setVisible(False)
         self.label2.setVisible(False)
         self.label3.setVisible(False)
@@ -65,25 +69,24 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
         self.oppervlakte_label.setVisible(False)
         self.oppervlakte.setVisible(False)
         self.bouwlaag_max.setVisible(False)
+        self.bouwlaag.setVisible(False)
+        self.copy.setVisible(False)
+
         for var in vars(self):
             typeVar = type(vars(self)[var])
             if typeVar == QCheckBox:
                 vars(self)[var].setVisible(False)
-        self.bouwlaag.setVisible(False)
-        self.copy.setVisible(False)
 
-    #copy polygon of bag feature
     def run_bag_overnemen(self):
-        #connect selecttool and set the maptool
+        """copy polygon of bag feature"""
         layerName = "BAG panden"
         ilayer = getlayer_byname(layerName)
-        request = QgsFeatureRequest().setFilterExpression( '"identificatie" = ' + str(self.objectId))
+        request = QgsFeatureRequest().setFilterExpression('"identificatie" = ' + str(self.objectId))
         ifeature = next(ilayer.getFeatures(request))
         self.copy_bag_bouwlaag(ilayer, ifeature)
-    
-    #copy floor from another floor
+
     def run_bouwlaag_overnemen(self):
-        #make buttons and labels visible to the user
+        """copy floor from another floor"""
         self.label1.setVisible(True)
         self.label2.setVisible(True)
         self.label3.setVisible(True)
@@ -98,9 +101,9 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
         #connect signal to slot
         self.bouwlaag.currentIndexChanged.connect(self.set_layer_subset_bouwlaag)
         self.selectTool.geomSelected.connect(self.copy_bag_bouwlaag)        
-    
-    #draw a floor with the basic functionality of QGIS
+
     def run_bouwlaag_tekenen(self):
+        """draw a floor with the basic functionality of QGIS"""
         snapLayer = []
         for name in self.snapLayerNames:
             lyr = getlayer_byname(name)
@@ -112,6 +115,7 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
         self.polygonTool.onGeometryAdded = self.draw_feature
         self.polygonTool.captureMode = 2
         self.canvas.setMapTool(self.polygonTool)
+
         self.lengte_label.setVisible(True)
         self.lengte.setVisible(True)
         self.oppervlakte_label.setVisible(True)
@@ -119,17 +123,18 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
         self.polygonTool.parent = self
 
     def run_select_bouwlaag(self):
+        """set selecttool as maptool"""
         self.canvas.setMapTool(self.selectTool)
-    
-    #set layers substring which are a childlayer of "bouwlagen"
+
     def set_layer_subset_bouwlaag(self):
+        """set layers substring which are a childlayer of "bouwlagen"""
         comboboxText = str(self.bouwlaag.currentText())
         if comboboxText != "":
             sub_string = "bouwlaag = " + str(self.bouwlaag.currentText())
             set_layer_substring(self.read_config, sub_string)            
 
     def copy_layers(self, parentID, newID , layer, bouwlaag):
-        # select the features
+        """select the features"""
         fields = layer.fields()
         newFeature = QgsFeature()        
         newFeature.initAttributes(fields.count())
@@ -155,8 +160,9 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
             newFeature[attr_fk] = int(newID)
             newFeature["bouwlaag"] = bouwlaag
             write_layer(layer, newFeature)
-            
+
     def copy_selected_layers(self, ifeature, newFeatureId, bouwlaag):
+        """copy related selected features"""
         bouwlaagID = ifeature["id"]
         for var in vars(self):
             typeVar = type(vars(self)[var])
@@ -166,12 +172,13 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
                     self.copy_layers(bouwlaagID, newFeatureId, copyLayer, bouwlaag) 
 
     def draw_feature(self, points, snapAngle):
+        """create the floor feature and save to the floors layer"""
         minBouwlaag = int(self.bouwlaag_min.text())
         maxBouwlaag = int(self.bouwlaag_max.text())
         childFeature = QgsFeature()
         layerName = 'Bouwlagen'
         layer = getlayer_byname(layerName)
-        question  = get_draw_layer_attr(layerName, "question", self.read_config)
+        question = get_draw_layer_attr(layerName, "question", self.read_config)
         label_req = get_draw_layer_attr(layerName, "label_required", self.read_config)        
         #get bouwdeel from user
         input_label = user_input_label(label_req, question)
@@ -188,7 +195,7 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
                 childFeature[attr_fk] = self.objectId
                 childFeature[attr_label] = input_label
                 childFeature["bouwlaag"] = i
-                newFeatureId = write_layer(layer, childFeature)
+                dummy = write_layer(layer, childFeature)
                 #block the signals of changing the comboBox to add the new floor
                 self.bouwlaag.blockSignals(True)
                 self.bouwlaag.clear()        
@@ -203,9 +210,10 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
         set_layer_substring(self.read_config, sub_string)
         if maxBouwlaag != minBouwlaag:
             QMessageBox.information(None, "Gereed!", "Alle bouwlagen zijn succesvol aangemaakt!")
-            
+
     def copy_bag_bouwlaag(self, ilayer, ifeature):
-        if ilayer.name() == 'Bouwlagen':
+        """copy the floor drom the BAG features"""
+        if ilayer.name() == 'Bouwlagen' or ilayer.name() == 'BAG panden':
             childFeature = QgsFeature()
             layerName = 'Bouwlagen'
             #get active floor from dockwidget
@@ -214,7 +222,7 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
             layer = getlayer_byname(layerName)
             #get necessary attributes from config file
             question = get_draw_layer_attr(layerName, "question", self.read_config)
-            label_req = get_draw_layer_attr(layerName, "label_required", self.read_config)        
+            label_req = get_draw_layer_attr(layerName, "label_required", self.read_config)
             #get bouwdeel from user
             input_label = user_input_label(label_req, question)
             attr_fk = get_draw_layer_attr(layerName, "foreign_key", self.read_config)
@@ -233,7 +241,7 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
                     newFeatureId = write_layer(layer, childFeature)
                     #copy also the selected layers
                     if ilayer.name() == "Bouwlagen":
-                        self.copy_selected_layers(ifeature, newFeatureId, i)  
+                        self.copy_selected_layers(ifeature, newFeatureId, i)
                     #block the signals of changing the comboBox to add the new floor
                     self.bouwlaag.blockSignals(True)
                     self.bouwlaag.clear()        
@@ -248,20 +256,20 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
             set_layer_substring(self.read_config, sub_string)
             try:
                 self.selectTool.geomSelected.disconnect()
-            except:
-                None
+            except:  # pylint: disable=bare-except
+                pass
             if maxBouwlaag >= minBouwlaag:
                 QMessageBox.information(None, "Gereed!", "Alle bouwlagen zijn succesvol aangemaakt!")
         else:
             QMessageBox.information(None, "Oeps:", "U heeft geen bouwlaag aangeklikt, selecteer opnieuw.")
             try:
                 self.selectTool.geomSelected.disconnect()
-            except:
-                None
+            except:  # pylint: disable=bare-except
+                pass
             self.selectTool.geomSelected.connect(self.copy_bag_bouwlaag)
-            
-    #add existing floors to the comboBox of the "bouwlaagdockwidget"
+
     def bouwlagen_to_combobox(self):
+        """add existing floors to the comboBox of the "bouwlaagdockwidget"""
         self.bouwlaag.blockSignals(True)    
         self.bouwlaag.clear()
         for i in range(len(self.bouwlaagList) + 1):
@@ -270,13 +278,14 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
             else:
                 self.bouwlaag.addItem(str(self.bouwlaagList[i - 1]))
         self.bouwlaag.blockSignals(False)
-        index = self.bouwlaag.findText(str(self.bouwlaag_min.text()), QtCore.Qt.MatchFixedString)
+        index = self.bouwlaag.findText(str(self.bouwlaag_min.text()), Qt.MatchFixedString)
         if index >= 0:
             self.bouwlaag.setCurrentIndex(index)
         else:
             self.bouwlaag.setCurrentIndex(0)
-        
+
     def close_bouwlaag(self):
+        """close floor widget and return to main menu"""
         self.label1.setVisible(False)
         self.label2.setVisible(False)
         self.label3.setVisible(False)
@@ -292,6 +301,6 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
         self.close()
         try:
             del self.objectwidget
-        except:
-            None
+        except:  # pylint: disable=bare-except
+            pass
         del self

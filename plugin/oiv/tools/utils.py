@@ -54,11 +54,12 @@ def nearest_neighbor(iface, layer, point):
     extent = iface.mapCanvas().extent()
     #veroorzaakt foutmelding als er niets in het kaartvenster staat, daarom in try/except statement
     index = QgsSpatialIndex(layer.getFeatures(QgsFeatureRequest(extent)))
+    print(index)
     try:
         parentId = index.nearestNeighbor(point, 1)[0]
         parentFeature = next(layer.getFeatures(QgsFeatureRequest(parentId)))
     except: # pylint: disable=bare-except
-        parentId = None
+        pass
     return parentFeature, parentId
 
 def request_feature(ifeature, layer_feature_id, layer_name):
@@ -91,8 +92,7 @@ def get_draw_layer_attr(runLayerName, qString, readConfig):
 
 def set_layer_substring(readConfig, subString):
     """set layer subset according (you can check the subset under properties of the layer)"""
-    next(readConfig)
-    for line in readConfig:
+    for line in readConfig[1:]:
         layer = getlayer_byname(line[0])
         layer.setSubsetString(subString)
 

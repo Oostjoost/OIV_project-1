@@ -1,38 +1,44 @@
-from qgis.PyQt.QtGui import QCursor, QColor
+"""Move or rotate a point feature on the map canvas"""
+
+from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtCore import Qt, QPoint
-from qgis.core import *
-from qgis.gui import *
-from .utils import *
-from qgis._gui import QgsRubberBand
+
+from qgis.core import QgsWkbTypes, QgsGeometry
+from qgis.gui import QgsRubberBand, QgsMapToolIdentify, QgsVertexMarker
+
+from .utils import check_layer_type
 
 class MovePointTool(QgsMapToolIdentify):
+    """identify the clicked point from the user and proces"""
+
     def __init__(self, canvas, layer):
         QgsMapToolIdentify.__init__(self, canvas)
-        self.canvas         = canvas
+        self.canvas = canvas
         self.setCursor(Qt.CrossCursor)
-        self.layer          = layer
-        self.dragging       = False
-        self.fields         = None
-        self.onMoved        = None
-        self.point          = None
-        self.startRotate    = False
-        self.tempRubberBand = None 
-        self.vertexMarker   = None
+        self.layer = layer
+        self.dragging = False
+        self.fields = None
+        self.onMoved = None
+        self.point = None
+        self.fid = None
+        self.idlayer = None
+        self.startRotate = False
+        self.tempRubberBand = None
+        self.vertexMarker = QgsVertexMarker(self.canvas)
 
     def canvasPressEvent(self, event):
-        #op welke feature wordt er geklikt
+        """op welke feature wordt er geklikt"""
         found_features = self.identify(event.x(), event.y(), self.TopDownStopAtFirst, self.VectorLayer)
         #check type van de laag, het werkt alleen voor point layers
         type_check = check_layer_type(found_features[0].mLayer)
         self.idlayer = found_features[0].mLayer
-        feature  = found_features[0].mFeature
+        feature = found_features[0].mFeature
         self.fid = feature.id()
         #indien de linkesmuisnop wordt geklikt, het betreft een point layer en er is een feature gevonden -> verslepen
         if event.button() == Qt.LeftButton:
-            if (len(found_features) > 0 and type_check == "Point"):
+            if found_features is not None and type_check == "Point":
                 self.dragging = True
                 #init drag point
-                self.vertexmarker = QgsVertexMarker(self.canvas)
                 self.vertexmarker.setColor(QColor(0, 0, 255))
                 self.vertexmarker.setIconSize(5)
                 self.vertexmarker.setIconType(QgsVertexMarker.ICON_X)
@@ -44,16 +50,16 @@ class MovePointTool(QgsMapToolIdentify):
                 self.fid  = None
         #indien de rechtermuisknop wordt geklikt -> roteren
         if event.button() == Qt.RightButton:
-            if (len(found_features) > 0 and type_check == "Point"):
+            if found_features is not None and type_check == "Point":
                 if not self.startRotate:
                     self.start_to_rotate(event)
             else:
                 self.startRotate = False
                 self.fid = None
-         
+
     def start_to_rotate(self, event):
-        mapPt,layerPt = self.transformCoordinates(event.pos())
-        #init tempRubberband indicating rotation
+        """init tempRubberband indicating rotation"""
+        mapPt, dummy = self.transformCoordinates(event.pos())
         color = QColor("black")
         color.setAlphaF(0.78)
         self.tempRubberBand = QgsRubberBand(self.canvas, QgsWkbTypes.LineGeometry)
@@ -61,11 +67,11 @@ class MovePointTool(QgsMapToolIdentify):
         self.tempRubberBand.setColor(color)
         self.tempRubberBand.setLineStyle(Qt.DotLine)
         self.tempRubberBand.show()
-        self.tempRubberBand.addPoint(mapPt) 
+        self.tempRubberBand.addPoint(mapPt)
         self.startRotate = True
-            
+
     def canvasMoveEvent(self, event):
-        #als verslepen -> verplaats de indicatieve marker
+        """als verslepen -> verplaats de indicatieve marker"""
         if self.dragging:
             mapPt, layerPt = self.transformCoordinates(event.pos())
             self.point = layerPt
@@ -74,14 +80,14 @@ class MovePointTool(QgsMapToolIdentify):
         if self.startRotate:
             mapPt, layerPt = self.transformCoordinates(event.pos())
             self.tempRubberBand.movePoint(mapPt)
-    
-    #transformeer muis lokatie naar canvas punt en laag punt 
+
     def transformCoordinates(self, canvasPt):
+        """transformeer muis lokatie naar canvas punt en laag punt"""
         return (self.toMapCoordinates(canvasPt),
                 self.toLayerCoordinates(self.layer, canvasPt))
 
     def canvasReleaseEvent(self, event):
-        #als verslepen -> pas de geometry van de betreffende feature aan
+        """als verslepen -> pas de geometry van de betreffende feature aan"""
         if self.dragging:
             self.vertexmarker.hide()
             geom = QgsGeometry.fromPointXY(self.point)
@@ -92,7 +98,7 @@ class MovePointTool(QgsMapToolIdentify):
         #als roteren -> pas de rotatie van de betreffende feature aan op basis van de loodrechte lijn tussen muisklik en bestaand punt
         if self.startRotate:
             self.tempRubberBand.hide()
-            mapPt,clickedPt = self.transformCoordinates(event.pos())
+            dummy, clickedPt = self.transformCoordinates(event.pos())
             tempGeometry = self.tempRubberBand.asGeometry().asPolyline()
             drawPoint = self.toLayerCoordinates(self.layer, tempGeometry[0])
             field = self.idlayer.fields().indexOf("rotatie")
@@ -102,16 +108,16 @@ class MovePointTool(QgsMapToolIdentify):
             self.idlayer.commitChanges()
             self.idlayer.triggerRepaint()
             self.stop_moveTool()
-        
-    #reset rubberbands
+
     def stop_moveTool(self):
-        if self.tempRubberBand != None:
+        """reset rubberbands"""
+        if self.tempRubberBand is not None:
             self.canvas.scene().removeItem(self.tempRubberBand)
             self.tempRubberBand = None
-        if self.vertexMarker != None:
+        if self.vertexMarker is not None:
             self.canvas.scene().removeItem(self.vertexMarker)
             self.vertexMarker = None
-        self.fid  = None
+        self.fid = None
         self.startRotate = False
         self.dragging = False
         self.onMoved()

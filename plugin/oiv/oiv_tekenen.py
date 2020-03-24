@@ -24,6 +24,7 @@ import os
 from qgis.PyQt import uic
 from qgis.PyQt.QtWidgets import QDockWidget, QPushButton, QMessageBox
 from qgis.PyQt.QtCore import Qt
+
 from qgis.core import QgsFeature, QgsGeometry
 from qgis.utils import iface
 
@@ -81,11 +82,10 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         self.pan.clicked.connect(self.activatePan)
         self.terug.clicked.connect(self.close_teken_show_object)
 
-
     def connect_buttons(self, configLines):
         """connect button and signals to the real action run"""
-        next(configLines)
-        for line in configLines:
+        #skip first line because of header
+        for line in configLines[1:]:
             layerName = line[0]
             csvPath = line[1]
 
@@ -301,13 +301,12 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
             geom = points[0]
         parentlayer = getlayer_byname(self.parentlayer_name)
         #vindt dichtsbijzijnde parentfeature om aan te koppelen
-        dummy, parentId  = nearest_neighbor(self.iface, parentlayer, geom)
+        dummy, parentId = nearest_neighbor(self.iface, parentlayer, geom)
         #foutafhandeling ivm als er geen parentfeature is gevonden binnen het kaartvenster in QGIS
-        if parentId is not None:
+        if parentId is None:
             QMessageBox.information(None, "Oeps:", "Geen bouwlaag gevonden om aan te koppelen.")
         else:
             #wegschrijven van de nieuwe feature, inclusief foreign_key en rotatie
-            #foreignKey = next(parentlayer.getFeatures(QgsFeatureRequest(parentFeature[0].id())))
             buttonCheck = self.get_attributes(parentId, childFeature, snapAngle)
             if buttonCheck != 'Cancel':
                 write_layer(self.draw_layer, childFeature)
