@@ -21,16 +21,17 @@
 """
 
 import os
-from . import resources
-import webbrowser
+
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import QDialog, QDockWidget
-from qgis.gui import *
-from qgis.core import *
+from qgis.PyQt.QtWidgets import QDockWidget
+#from qgis.gui import *
+from qgis.core import QgsFeatureRequest, QgsFeature, QgsGeometry
 from qgis.utils import iface
-from .tools.utils import *
-from .tools.query_bag import *
+
+#from . import resources
+from .tools.utils import get_draw_layer_attr, user_input_label, getlayer_byname, write_layer
+#from .tools.query_bag import *
 from .oiv_objectgegevens import oivObjectWidget
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
@@ -40,6 +41,7 @@ class oivObjectNieuwWidget(QDockWidget, FORM_CLASS):
 
     canvas = None
     read_config = None
+    newObject = None
     draw_layer = None
     basewidget = None
     objectwidget = None
@@ -57,8 +59,8 @@ class oivObjectNieuwWidget(QDockWidget, FORM_CLASS):
         self.close()
         try:
             del self.objectwidget
-        except:
-            None
+        except: # pylint: disable=bare-except
+            pass
         self.basewidget.show()
         del self
 
@@ -86,8 +88,7 @@ class oivObjectNieuwWidget(QDockWidget, FORM_CLASS):
             newFeatureId = write_layer(self.draw_layer, childFeature)
             tempFeature = QgsFeature()
             self.newObject = newFeatureId
-            request = QgsFeatureRequest().setFilterExpression( '"id" = ' + str(self.newObject))
-            print(str(self.newObject))
+            request = QgsFeatureRequest().setFilterExpression('"id" = ' + str(self.newObject))
             tempFeature = next(self.draw_layer.getFeatures(request))
             #with new created feature run existing object widget
             self.run_objectgegevens(tempFeature)
@@ -116,8 +117,8 @@ class oivObjectNieuwWidget(QDockWidget, FORM_CLASS):
         else:
             return 'Cancel'
 
-    #continue to existing object woth the newly created feature and already searched address
     def run_objectgegevens(self, tempFeature):
+        """continue to existing object woth the newly created feature and already searched address"""
         self.draw_layer = getlayer_byname('Objecten')
         self.objectwidget.draw_layer = self.draw_layer
         self.objectwidget.existing_object(tempFeature, self.newObject)

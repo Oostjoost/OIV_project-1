@@ -28,7 +28,6 @@ from qgis.PyQt.QtCore import Qt
 from qgis.core import QgsFeature, QgsGeometry
 from qgis.utils import iface
 
-#from . import resources
 from .tools.mapTool import CaptureTool
 from .tools.identifyTool import SelectTool
 from .tools.utils import check_layer_type, get_draw_layer_attr, getlayer_byname, write_layer, user_input_label, nearest_neighbor
@@ -39,20 +38,20 @@ FORM_CLASS, _ = uic.loadUiType(os.path.join(
 
 class oivTekenWidget(QDockWidget, FORM_CLASS):
     """Organize all draw features on the map"""
-    read_config     = None
-    iface           = None
-    canvas          = None
-    tekenTool       = None
-    identifier      = None
-    parenlayer_name = None
+    read_config = None
+    iface= None
+    canvas = None
+    tekenTool = None
+    identifier = None
+    parentlayer_name = None
     draw_layer_type = None
-    draw_layer      = None
+    draw_layer = None
     editable_layers = []
-    objectwidget    = None
-    lineTool        = None
-    polygonTool     = None
-    moveTool        = None
-    selectTool      = None
+    objectwidget = None
+    lineTool = None
+    polygonTool = None
+    moveTool = None
+    selectTool = None
     #id van pictogram
     snappicto = ['1', '10', '32', '47', '148', '149', '150', '151', '152',\
                  '1011', 'Algemeen', 'Voorzichtig', 'Waarschuwing', 'Gevaar'] 

@@ -21,19 +21,21 @@
 """
 
 import os
-from . import resources
-import webbrowser
+
 from qgis.PyQt import uic
 from qgis.PyQt.QtWidgets import QDockWidget, QPushButton, QMessageBox
 from qgis.PyQt.QtCore import Qt
-from qgis.gui import *
-from qgis.core import *
+
+from qgis.core import QgsFeatureRequest, QgsGeometry, QgsFeature
 from qgis.utils import iface
-from .tools.utils import *
+
+from .tools.utils import getlayer_byname, get_draw_layer_attr, check_layer_type, write_layer, user_input_label, nearest_neighbor
 from .tools.identifyTool import IdentifyGeometryTool
+
 from .oiv_stackwidget import oivStackWidget
 from .tools.mapTool import CaptureTool
 from .tools.identifyTool import SelectTool
+#from . import resources
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'oiv_object_teken_widget.ui'))
@@ -53,7 +55,8 @@ class oivObjectTekenWidget(QDockWidget, FORM_CLASS):
     identifyTool    = None
     draw_layer      = None
     identifier      = None
-    parentlayer_name= None
+    tFeature = None
+    parentlayer_name = None
     draw_layer_type = None
     editable_layers = []
     lineTool        = None
@@ -66,6 +69,7 @@ class oivObjectTekenWidget(QDockWidget, FORM_CLASS):
     def __init__(self, parent=None):
         super(oivObjectTekenWidget, self).__init__(parent)
         self.setupUi(self)
+
         self.iface = iface
         self.object_id.setVisible(False)
         self.lengte_label.setVisible(False)
@@ -87,7 +91,7 @@ class oivObjectTekenWidget(QDockWidget, FORM_CLASS):
         self.object_id.setText(str(objectId))
         self.formelenaam.setText(ifeature["formelenaam"])
         layerName = "Objecten"
-        request = QgsFeatureRequest().setFilterExpression( '"id" = ' + str(objectId))
+        request = QgsFeatureRequest().setFilterExpression('"id" = ' + str(objectId))
         tempLayer = getlayer_byname(layerName)
         self.tFeature = next(tempLayer.getFeatures(request))
 
@@ -100,46 +104,58 @@ class oivObjectTekenWidget(QDockWidget, FORM_CLASS):
         self.terug.clicked.disconnect()
         try:
             del self.stackwidget
-        except:
-            None
+        except: # pylint: disable=bare-except
+            pass
         self.close()
         self.repressiefobjectwidget.show()
-        del self        
+        del self
 
     #connect button and signals to the real action run
-    def connect_buttons(self, config_lines):
-        for i in range(1, len(config_lines)):
-            if config_lines[i][1] != "":
-                #alle kaartlagen, toevoegen aan de lijst editable_layers
-                self.editable_layers.append(config_lines[i][0])
-                layer = getlayer_byname(config_lines[i][0])
-                layerType = check_layer_type(layer)
-                if layerType == "Point":
-                    self.moveLayerNames.append(config_lines[i][0])
-                action_list = self.read_config_file(config_lines[i][1])
-                self.ini_action(action_list, config_lines[i][0])
+    def connect_buttons(self, configLines):
+        """connect button and signals to the real action run"""
+        #skip first line because of header
+        for line in configLines[1:]:
+            layerName = line[0]
+            csvPath = line[1]
 
-    def ini_action(self, picto_list, run_layer):
-        for i in range(len(picto_list)):
-            buttonName = str(picto_list[i][1].lower())
+            if csvPath:
+                self.editable_layers.append(layerName)
+                layer = getlayer_byname(layerName)
+                layerType = check_layer_type(layer)
+
+                if layerType == "Point":
+                    self.moveLayerNames.append(layerName)
+
+                actionList = self.read_config_file(csvPath)
+                self.ini_action(actionList, layerName)
+
+    def ini_action(self, actionList, run_layer):
+        """connect all the buttons to the action"""
+        for action in actionList:
+            buttonNr = action[0]
+            buttonName = str(action[1].lower())
             strButton = self.findChild(QPushButton, buttonName)
-            #set tooltip per buttonn
-            if strButton != None:    
-                strButton.setToolTip(picto_list[i][1].lower())
-                #geef met de signal ook mee welke knop er is geklikt -> pictogram nummer
-                strButton.clicked.connect(lambda dummy = 'dummyvar', rlayer = run_layer, who = picto_list[i][0]: self.run_tekenen(dummy, rlayer, who))
-                #QObject.connect(strButton, SIGNAL("clicked()"),lambda run_layer = run_layer, who = picto_list[i][0]: self.run_tekenen(run_layer, who))
+
+            if strButton:
+                #set tooltip per buttonn
+                strButton.setToolTip(buttonName)
+                #geef met de signal ook mee welke knop er is geklikt -> nr
+                strButton.clicked.connect(lambda dummy='dummyvar', rlayer=run_layer, who=buttonNr: self.run_tekenen(dummy, rlayer, who))
 
     # Read lines from input file and convert to list
     def read_config_file(self, file):
-        config_list = []
+        """Read lines from input file and convert to list"""
+        configList = []
         basepath = os.path.dirname(os.path.realpath(__file__))
-        with open(basepath + file, 'r' ) as inp_file:
-            lines = inp_file.read().splitlines()
+
+        with open(basepath + file, 'r') as inputFile:
+            lines = inputFile.read().splitlines()
+
         for line in lines:
-            config_list.append(line.split(','))
-        inp_file.close()
-        return config_list
+            configList.append(line.split(','))
+        inputFile.close()
+
+        return configList
 
     def activatePan(self):
         self.iface.actionPan().trigger()
@@ -276,7 +292,6 @@ class oivObjectTekenWidget(QDockWidget, FORM_CLASS):
 
     def place_feature(self, points, snapAngle):
         childFeature = QgsFeature()
-        parentFeature = None
         parentId = None
         #parentFeature = QgsFeature()
         self.iface.setActiveLayer(self.draw_layer)
@@ -295,18 +310,18 @@ class oivObjectTekenWidget(QDockWidget, FORM_CLASS):
             parentId = int(self.object_id.text())
         elif self.parentlayer_name != '':
             parentlayer = getlayer_byname(self.parentlayer_name)
-            parentFeature, parentId = nearest_neighbor(self.iface, parentlayer, geom)
+            dummy, parentId = nearest_neighbor(self.iface, parentlayer, geom)
         else:
             parentId = None
         #foutafhandeling ivm als er geen parentId is
-        if parentId == None and self.parentlayer_name != '':
+        if parentId is None and self.parentlayer_name != '':
             QMessageBox.information(None, "Oeps:", "Geen object gevonden om aan te koppelen.")
         else:
             #wegschrijven van de nieuwe feature, inclusief foreign_key en rotatie
             #foreignKey = next(parentlayer.getFeatures(QgsFeatureRequest(parentFeature[0].id())))
             buttonCheck = self.get_attributes(parentId, childFeature, snapAngle)
             if buttonCheck != 'Cancel':
-                newFeatureId = write_layer(self.draw_layer, childFeature)
+                write_layer(self.draw_layer, childFeature)
         #opnieuw activeren tekentool, zodat er meerdere pictogrammen achter elkaar kunnen worden geplaatst
         self.run_tekenen('dummy', self.draw_layer.name(), self.identifier)
         #self.activatePan()

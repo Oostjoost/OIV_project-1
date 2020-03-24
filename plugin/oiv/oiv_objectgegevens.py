@@ -21,17 +21,21 @@
 """
 
 import os
-from . import resources
 import webbrowser
+
+#from . import resources
+#from .tools.identifyTool import IdentifyGeometryTool
+
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import QDialog, QDockWidget, QVBoxLayout, QLabel, QMessageBox, QComboBox, QDialogButtonBox
-from qgis.gui import *
-from qgis.core import *
+
+from qgis.core import QgsFeatureRequest
 from qgis.utils import iface
-from .tools.utils import *
-from .tools.identifyTool import IdentifyGeometryTool
-from .tools.query_bag import *
+
+from .tools.utils import getlayer_byname, set_layer_substring, create_unique_sorted_list, get_draw_layer_attr, refresh_layers
+from .tools.query_bag import ask_bag_adress
+
 from .oiv_bouwlaag import oivBouwlaagWidget
 from .oiv_stackwidget import oivStackWidget
 from .oiv_tekenen import oivTekenWidget
@@ -84,7 +88,7 @@ class oivObjectWidget(QDockWidget, FORM_CLASS):
         self.close()
         self.stackwidget.show()
 
-    def existing_object(self, ifeature, objectId):
+    def existing_object(self, dummy, objectId):
         #Get the related BAG attributes from BAG API
         ilayer = getlayer_byname('BAG panden')
         foreignKey = 'identificatie'
@@ -143,20 +147,20 @@ class oivObjectWidget(QDockWidget, FORM_CLASS):
         set_layer_substring(self.read_config, sub_string)
         try:
             del self.tekenwidget
-        except:
-            None
+        except: # pylint: disable=bare-except
+            pass
         try:
             del self.stackwidget
-        except:
-            None
+        except: # pylint: disable=bare-except
+            pass
         try:
             del self.bouwlaagwidget
-        except:
-            None
+        except: # pylint: disable=bare-except
+            pass
         self.close()
         self.basewidget.show()
         self.iface.actionPan().trigger()
-        del self        
+        del self
 
     #select bouwlaag on canvas to edit the atrribute form
     def run_bouwlaag_bewerken(self):
@@ -194,10 +198,8 @@ class oivObjectWidget(QDockWidget, FORM_CLASS):
                 break
             elif bouwlaagMax < bouwlaag:
                 QMessageBox.information(None, "Oeps:", "De hoogste bouwlaag kan niet lager zijn als de laagste, vul opnieuw in!.")
-            elif ok == False:
+            elif ok is False:
                 break
-            else:    
-                True
 
     #init teken widget
     def run_tekenen(self):

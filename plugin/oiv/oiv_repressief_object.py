@@ -53,6 +53,7 @@ class oivRepressiefObjectWidget(QDockWidget, FORM_CLASS):
     tekenTool = None
     attributeform = None
     objectFeature = None
+    tFeature = None
     identifyTool = None
     draw_layer = None
     identifier = None
@@ -62,6 +63,7 @@ class oivRepressiefObjectWidget(QDockWidget, FORM_CLASS):
     polygonTool = None
     moveTool = None
     snapLayerNames = ["Bouwlagen", "BAG panden", "Object terrein"]
+    tekensymbolenwidget = None
 
     def __init__(self, parent=None):
         super(oivRepressiefObjectWidget, self).__init__(parent)
