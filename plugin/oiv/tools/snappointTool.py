@@ -133,7 +133,7 @@ class SnapPointTool(QgsMapTool):
             except: # pylint: disable=bare-except
                 pass
         #bereken het dichtsbijzijnde snappunt voor alle snap lagen
-        if distance is not None:
+        if distance:
             val, idx = min((val, idx) for (idx, val) in enumerate(distance))
         if val <= tolerance and val != 0:
             transformLayer = self.snapLayer[0]

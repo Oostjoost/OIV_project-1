@@ -25,7 +25,7 @@ from qgis.PyQt import uic
 from qgis.PyQt.QtWidgets import QDockWidget, QPushButton, QMessageBox
 from qgis.PyQt.QtCore import Qt
 
-from qgis.core import QgsFeature, QgsGeometry
+from qgis.core import QgsFeature, QgsGeometry, QgsFeatureRequest
 from qgis.utils import iface
 
 from .tools.mapTool import CaptureTool
@@ -39,7 +39,7 @@ FORM_CLASS, _ = uic.loadUiType(os.path.join(
 class oivTekenWidget(QDockWidget, FORM_CLASS):
     """Organize all draw features on the map"""
     read_config = None
-    iface= None
+    iface = None
     canvas = None
     tekenTool = None
     identifier = None
@@ -56,7 +56,7 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
     snappicto = ['1', '10', '32', '47', '148', '149', '150', '151', '152',\
                  '1011', 'Algemeen', 'Voorzichtig', 'Waarschuwing', 'Gevaar'] 
     moveLayerNames = []
-    snapLayerNames = ["Bouwlagen", "BAG panden", "Object terrein",\
+    snapLayerNames = ["BAG panden", "Bouwlagen", \
                         "Bouwkundige veiligheidsvoorzieningen", "Ruimten"]
 
     def __init__(self, parent=None):
@@ -225,9 +225,33 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
             moveLayer.commitChanges()        
         self.activatePan()
 
+    def get_possible_snapFeatures(self):
+        possibleSnapFeatures = []
+        snapLayer = []
+        bouwlaagIds = []
+        for name in self.snapLayerNames:
+            lyr = getlayer_byname(name)
+            snapLayer.append(lyr)
+            if name == 'BAG panden':
+                request = QgsFeatureRequest().setFilterExpression('"identificatie" = ' + self.pand_id.text())
+                tempFeature = next(lyr.getFeatures(request))
+                possibleSnapFeatures.append(tempFeature.geometry())
+            elif name == 'Bouwlagen':
+                request = QgsFeatureRequest().setFilterExpression('"pand_id" = ' + self.pand_id.text())
+                featureIt = lyr.getFeatures(request)
+                for feat in featureIt:
+                    bouwlaagIds.append(feat["id"])
+                    possibleSnapFeatures.append(feat.geometry())
+            elif bouwlaagIds:
+                for bid in bouwlaagIds:
+                    request = QgsFeatureRequest().setFilterExpression('"bouwlaag_id" = ' + str(bid))
+                    featureIt = lyr.getFeatures(request)
+                    for feat in featureIt:
+                        possibleSnapFeatures.append(feat.geometry())
+        return snapLayer, possibleSnapFeatures
+
     def run_tekenen(self, dummy, run_layer, feature_id):
         """activate the right draw action"""
-        snapLayer = []
         #welke pictogram is aangeklikt en wat is de bijbehorende tekenlaag
         self.identifier = feature_id
         self.draw_layer = getlayer_byname(run_layer)
@@ -236,9 +260,8 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         #wat is the parentlayer, uitlezen vanuit de config file
         self.parentlayer_name = get_draw_layer_attr(run_layer, "parent_layer", self.read_config)
         #aan welke lagen kan worden gesnapt?
-        for name in self.snapLayerNames:
-            lyr = getlayer_byname(name)
-            snapLayer.append(lyr)
+        snapLayer, possibleSnapFeatures = self.get_possible_snapFeatures()
+
         if self.draw_layer_type == "Point":
             self.tekenTool.snapPt = None
             self.tekenTool.snapping = False
@@ -258,6 +281,7 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         elif self.draw_layer_type == "Line":
             self.lineTool.layer = self.draw_layer
             self.lineTool.snapLayer = snapLayer
+            self.lineTool.possibleSnapFeatures = possibleSnapFeatures
             self.lineTool.canvas = self.canvas
             self.lineTool.onGeometryAdded = self.place_feature
             self.lineTool.captureMode = 1
@@ -272,6 +296,7 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         elif self.draw_layer_type == "Polygon":
             self.polygonTool.layer = self.draw_layer
             self.polygonTool.snapLayer = snapLayer
+            self.polygonTool.possibleSnapFeatures = possibleSnapFeatures
             self.polygonTool.canvas = self.canvas
             self.polygonTool.onGeometryAdded = self.place_feature
             self.polygonTool.captureMode = 2

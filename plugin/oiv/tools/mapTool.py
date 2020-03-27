@@ -4,7 +4,7 @@ from math import cos, sin, radians
 
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtCore import Qt, QPoint
-from qgis.core import QgsDistanceArea, QgsFeatureRequest, QgsSpatialIndex, QgsPoint, QgsPointXY, QgsRectangle, QgsWkbTypes, QgsCircle, QgsGeometry
+from qgis.core import QgsDistanceArea, QgsFeature, QgsFeatureRequest, QgsSpatialIndex, QgsPoint, QgsPointXY, QgsRectangle, QgsWkbTypes, QgsCircle, QgsGeometry
 from qgis.gui import QgsVertexMarker, QgsMapTool, QgsRubberBand
 
 class CaptureTool(QgsMapTool):
@@ -27,6 +27,7 @@ class CaptureTool(QgsMapTool):
         self.capturing = False
         self.snapPt = None
         self.snapFeature = []
+        self.possibleSnapFeatures = []
         self.vertexmarker = None
         self.snapLayer = []
         self.parent = None
@@ -92,107 +93,47 @@ class CaptureTool(QgsMapTool):
             self.vertexmarker.show()
 
     def snap_to_point(self, pos, layerPt):
-        """check of er gesnapt kan worden"""
+        #index = QgsSpatialIndex(self.possibleSnapFeatures)
+        tolerance = pow(self.calcTolerance(pos), 2)
+        minDist = tolerance
         snapPoints = []
-        distance = []
-        self.snapFeature.clear()
-        snapPoint = None
-        val = None
-        idx = None
-        #initialiseer the vertexmarker (virtueel snappunt)
+        counter = 0
+
         if self.vertexmarker is None:
-            self.vertexmarker = QgsVertexMarker(self.canvas)
-            self.vertexmarker.setColor(QColor(255, 0, 255))
-            self.vertexmarker.setIconSize(8)
-            self.vertexmarker.setIconType(QgsVertexMarker.ICON_X) # or ICON_CROSS, ICON_X
-            self.vertexmarker.setPenWidth(5)
-            self.vertexmarker.show()
-        #creeer lijst met alle mogelijke snappunten
-        self.snapFeature = []
-        #max snap tolerantie
-        tolerance = pow(self.calcTolerance(pos),2)
-        #bereken snap "vierkant" rondom muis lokatie
-        extent = self.calcExtent(layerPt, tolerance)
-        #vraag mogelijke features op binnen het extent
-        request = QgsFeatureRequest()
-        request.setFilterRect(extent)
-        request.setFlags(QgsFeatureRequest.ExactIntersect)
-        #bereken voor alle mogelijke snap lagen:
-        for ilayer in self.snapLayer:
-            index = None
-            igeometry = None
-            ifeature = None
-            polygon = []
-            closestSegm = None
-            distSquared = None
-            vertexCoord = None
-            vertex = None
-            prevVertex = None
-            #bereken een spatial index
-            if type(ilayer) != QgsRubberBand:
-                try:
-                    index = QgsSpatialIndex(ilayer.getFeatures(request))
-                    if index is not None:
-                        #bereken de dichtsbijzijnde feature per snaplaag
-                        nearestId = index.nearestNeighbor(layerPt, 1)[0]
-                        ifeature = next(ilayer.getFeatures(QgsFeatureRequest(nearestId)))
-                        igeometry = ifeature.geometry()
-                        #return dichtsbijzijnde lijnsegment van de features geometrie
-                        closestSegm = igeometry.closestSegmentWithContext(layerPt)
-                        #return dichtsbijzijnde punt van de features geometrie
-                        vertexCoord, vertex, prevVertex, dummy, distSquared = igeometry.closestVertex(layerPt)
-                except: # pylint: disable=bare-except
-                    pass
-            #snappen op bestaande "rubberband" lagen moet ook mogelijk zijn
-            elif type(ilayer) == QgsRubberBand:
-                #converyt rubberband geometry to QgsGeometry
-                igeometry = ilayer.asGeometry()
-                if igeometry is not None:
-                    closestSegm = igeometry.closestSegmentWithContext(layerPt)
-                    vertexCoord, vertex, prevVertex, dummy, distSquared = igeometry.closestVertex(layerPt)
-            #als er een mogelijk snappunt is gevonden en deze valt binnen de tolerantie:
-            #kijk eerst naar hoekpunt en dan pas naar lijnsegment(variabele -> tuple) (de voorkeur heeft snappen op hoekpunten)
-            if distSquared is not None and distSquared <= tolerance and igeometry is not None and igeometry.isNull() is not False:
-                if type(ilayer) == QgsRubberBand:
-                    polygon = igeometry.asPolyline()
-                elif ilayer.wkbType() == QgsWkbTypes.MultiLineString:
-                    polygon = igeometry.asMultiPolyline()[0]
-                elif ilayer.wkbType() == 1003 or ilayer.wkbType() == 6:
-                    polygon = igeometry.asMultiPolygon()[0][0]
-                else:
-                    polygon = igeometry.asPolygon()[0]
-                #voeg dit punt toe aan de mogelijke snappunten
-                if polygon != [] and vertexCoord != QgsPointXY(0,0):
-                    distance.append(distSquared)
-                    snapPoints.append([vertexCoord, vertex, prevVertex, polygon])
-            elif closestSegm is not None and closestSegm[1] != QgsPointXY(0, 0):
-                if closestSegm[0] <= tolerance:
-                    distance.append(closestSegm[0])
-                    snapPoints.append([closestSegm[1], None, None, None])
+            self.init_vertexmarker()
+
+        for geom in self.possibleSnapFeatures:
+            closestSegm = geom.closestSegmentWithContext(layerPt)
+            vertexCoord, vertex, prevVertex, dummy, distSquared = geom.closestVertex(layerPt)
+            if distSquared < minDist:
+                minDist = distSquared
+                snapPoints = []
+                snapPoints.extend([vertexCoord, vertex, prevVertex, counter, geom])
+            elif closestSegm[0] < minDist:
+                minDist = closestSegm[0]
+                snapPoints = []
+                snapPoints.extend([closestSegm[1], None, None, counter, geom])
+            counter += 1
+
+        if snapPoints:
+            snapPoint = snapPoints[0]
+            igeometry = snapPoints[4]
+
+            if igeometry.wkbType() == QgsWkbTypes.LineString:
+                polygon = igeometry.asPolyline()
+            elif igeometry.wkbType() == QgsWkbTypes.MultiLineString:
+                polygon = igeometry.asMultiPolyline()[0]
+            elif igeometry.wkbType() == 1003 or igeometry.wkbType() == 6:
+                polygon = igeometry.asMultiPolygon()[0][0]
             else:
-                #Als het snappunt niet binnen de tolerantie valt, voeg dan een grote integer toe als snap afstand
-                distance.append(tolerance + 9999)
-                snapPoints.append([None, None, None, None])
+                polygon = igeometry.asPolygon()[0]
 
-        #als er mogelijke snappunten zijn:
-        if distance is not None:
-            #bereken de korste afstand met zijn id -> dit wordt het snappunt
-            val, idx = min((val, idx) for (idx, val) in enumerate(distance))
+            if snapPoints[1] is not None:
+                self.snapFeature.extend((snapPoints[1], snapPoints[2], polygon))
+            else:
+                self.snapFeature.extend((None, None, None))
 
-        #construct the point to return as snappoint
-        if val is not None:
-            if val <= tolerance:
-                #if type(ilayer) == QgsRubberBand:
-                #    snapPoint = snapPoints[idx][0]
-                #else:
-                transformLayer = self.snapLayer[0]
-                snapPoint = self.toMapCoordinates(transformLayer, snapPoints[idx][0])
-                #sla zowel de feature als het punt op...de feature is nodig voor de perpendicular rubberbands
-                if snapPoints[idx][1] is not None:
-                    self.snapFeature.extend((snapPoints[idx][1], snapPoints[idx][2], snapPoints[idx][3]))
-                else:
-                    self.snapFeature.extend((None, None, None))
-        return snapPoint
+            return snapPoint
 
     def calcExtent(self, layerPt, tolerance):
         """bereken snap extent"""
@@ -235,6 +176,14 @@ class CaptureTool(QgsMapTool):
         return (self.toMapCoordinates(canvasPt),
                 self.toLayerCoordinates(self.layer, canvasPt))
 
+    def init_vertexmarker(self):
+        self.vertexmarker = QgsVertexMarker(self.canvas)
+        self.vertexmarker.setColor(QColor(255, 0, 255))
+        self.vertexmarker.setIconSize(8)
+        self.vertexmarker.setIconType(QgsVertexMarker.ICON_X) # or ICON_CROSS, ICON_X
+        self.vertexmarker.setPenWidth(5)
+        self.vertexmarker.show()
+
     def startCapturing(self):
         """bij starten van het tekenen intialiseer de rubberbands"""
         #rubberband voor de al vastgelegde punten
@@ -264,7 +213,7 @@ class CaptureTool(QgsMapTool):
         self.perpRubberBand2.setColor(QColor("blue"))
         self.perpRubberBand2.setLineStyle(Qt.DotLine)
         self.perpRubberBand2.show()
-        
+
         self.roundRubberBand = QgsRubberBand(self.canvas, QgsWkbTypes.LineGeometry)
         self.roundRubberBand.setWidth(1)
         borderColor = QColor("blue")
@@ -301,7 +250,7 @@ class CaptureTool(QgsMapTool):
             self.perpRubberBand = None
         if self.perpRubberBand2:
             self.canvas.scene().removeItem(self.perpRubberBand2)
-            self.perpRubberBand2 = None              
+            self.perpRubberBand2 = None
         self.vertexmarker.hide()
         self.capturing = False
         self.capturedPoints = []
@@ -350,8 +299,8 @@ class CaptureTool(QgsMapTool):
             layerPt = self.toLayerCoordinates(self.layer, self.snapPt)
             #bereken de snaphoek van het geklikte punt ten opzichte van het snappunt
             snapAngle = clickedPt.azimuth(layerPt) + 90
-            bandSize  = self.rubberBand.numberOfVertices()
-            lastPt    = self.rubberBand.getPoint(0, bandSize-1)
+            bandSize = self.rubberBand.numberOfVertices()
+            lastPt = self.rubberBand.getPoint(0, bandSize-1)
             self.draw_perpendicularBand(lastPt, snapAngle)
 
     def roundrubberband_change_straal(self):
@@ -375,28 +324,30 @@ class CaptureTool(QgsMapTool):
         geom_cString = test.toCircularString()
         geom_from_curve = QgsGeometry(geom_cString)
         self.roundRubberBand.setToGeometry(geom_from_curve)
-        self.snapLayer.append(self.roundRubberBand)
-        #self.roundRubberBand.setToGeometry(geom_cString)
-        self.perpRubberBand.addPoint(QgsPointXY(x1,y1))
-        self.perpRubberBand.addPoint(QgsPointXY(x2,y2))
+        #self.snapLayer.append(self.roundRubberBand)
+        self.possibleSnapFeatures.append(self.roundRubberBand.asGeometry())
+        self.perpRubberBand.addPoint(QgsPointXY(x1, y1))
+        self.perpRubberBand.addPoint(QgsPointXY(x2, y2))
         self.perpRubberBand.show()
         #voeg de rubberband toe als mogelijke snap laag
-        self.snapLayer.append(self.perpRubberBand)
+        #self.snapLayer.append(self.perpRubberBand)
+        self.possibleSnapFeatures.append(self.perpRubberBand.asGeometry())
         #als het een hoek betreft moeten er 2 haakse lijnen worden getekend
         if self.snapFeature is None or self.snapFeature[2] is None:
-            if self.perpRubberBand2 in self.snapLayer:
-                self.snapLayer.remove(self.perpRubberBand2)
+            if self.perpRubberBand2.asGeometry() in self.possibleSnapFeatures:
+                self.possibleSnapFeatures.remove(self.perpRubberBand2.asGeometry())
         try:
             if self.snapFeature[2] is not None:
                 x3 = startPt.x() + length * sin(radians(angle + 90))
                 y3 = startPt.y() + length * cos(radians(angle + 90))
                 x4 = startPt.x() + length * sin(radians(angle + 270))
                 y4 = startPt.y() + length * cos(radians(angle + 270))
-                self.perpRubberBand2.addPoint(QgsPointXY(x3,y3))
-                self.perpRubberBand2.addPoint(QgsPointXY(x4,y4))
+                self.perpRubberBand2.addPoint(QgsPointXY(x3, y3))
+                self.perpRubberBand2.addPoint(QgsPointXY(x4, y4))
                 self.perpRubberBand2.show()
                 #voeg de rubberband toe als mogelijke snap laag
-                self.snapLayer.append(self.perpRubberBand2)
+                #self.snapLayer.append(self.perpRubberBand2)
+                self.possibleSnapFeatures.append(self.perpRubberBand.asGeometry())
         except:  # pylint: disable=bare-except
             pass
 

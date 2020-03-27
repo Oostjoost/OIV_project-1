@@ -201,26 +201,27 @@ class oivObjectWidget(QDockWidget, FORM_CLASS):
             elif ok is False:
                 break
 
-    #init teken widget
     def run_tekenen(self):
+        """init teken widget"""
         self.tekenwidget.canvas = self.canvas
         self.tekenwidget.read_config = self.read_config
         self.tekenwidget.tekenTool = self.tekenTool
         self.tekenwidget.lineTool = self.lineTool
         self.tekenwidget.polygonTool = self.polygonTool
         self.tekenwidget.moveTool = self.moveTool
-        self.tekenwidget.selectTool = self.selectTool        
+        self.tekenwidget.selectTool = self.selectTool
         self.tekenwidget.objectwidget = self
         sub_string = "bouwlaag = " + str(self.comboBox.currentText())
         set_layer_substring(self.read_config, sub_string)        
         self.tekenwidget.bouwlaag.setText(str(self.comboBox.currentText()))
-        self.iface.addDockWidget(Qt.RightDockWidgetArea, self.tekenwidget) 
+        self.tekenwidget.pand_id.setText(self.pand_id.text())
+        self.iface.addDockWidget(Qt.RightDockWidgetArea, self.tekenwidget)
         self.close()
         self.tekenwidget.show()
-        self.tekenwidget.connect_buttons(self.read_config)     
+        self.tekenwidget.connect_buttons(self.read_config)
 
-    #open url based on BAG pand_id, i.v.m. terugmelden    
     def openBagviewer(self):
+        """open url based on BAG pand_id, i.v.m. terugmelden"""
         url = 'https://bagviewer.kadaster.nl/lvbag/bag-viewer/#?searchQuery=' + str(self.pand_id.text())
         webbrowser.open(url)
 
@@ -229,12 +230,13 @@ class oivObjectWidget(QDockWidget, FORM_CLASS):
         ilayer = getlayer_byname(layerName)
         self.iface.setActiveLayer(ilayer)
         objectId = self.pand_id.text()
-        request = QgsFeatureRequest().setFilterExpression( '"pand_id" = ' + str(objectId)).setFlags(QgsFeatureRequest.NoGeometry).setSubsetOfAttributes([])
+        request = QgsFeatureRequest().setFilterExpression('"pand_id" = ' + str(objectId)).setFlags(QgsFeatureRequest.NoGeometry).setSubsetOfAttributes([])
         ifeature = next(ilayer.getFeatures(request))
         ilayer.startEditing()
         ilayer.selectByIds([ifeature.id()])
-        reply = QMessageBox.question(self.iface.mainWindow(), 'Continue?', 
-             "Weet u zeker dat u de geselecteerde feature wilt weggooien?", QMessageBox.Yes, QMessageBox.No)
+        reply = QMessageBox.question(self.iface.mainWindow(), 'Continue?',
+                                     "Weet u zeker dat u de geselecteerde feature wilt weggooien?",\
+                                     QMessageBox.Yes, QMessageBox.No)
         if reply == QMessageBox.No:
             #als "nee" deselecteer alle geselecteerde features
             ilayer.setSelectedFeatures([])

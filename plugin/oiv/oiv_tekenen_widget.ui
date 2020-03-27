@@ -33,9 +33,9 @@
        <property name="geometry">
         <rect>
          <x>0</x>
-         <y>-194</y>
+         <y>0</y>
          <width>405</width>
-         <height>858</height>
+         <height>884</height>
         </rect>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout">
@@ -43,47 +43,36 @@
          <layout class="QGridLayout" name="gridLayout">
           <item row="3" column="1">
            <layout class="QGridLayout" name="gridLayout_6">
-            <item row="8" column="3">
-             <widget class="QPushButton" name="delete_f">
-              <property name="toolTip">
-               <string>delete object...</string>
+            <item row="1" column="0" colspan="5">
+             <widget class="QLabel" name="label_6">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="font">
+               <font>
+                <family>Arial</family>
+                <weight>75</weight>
+                <bold>true</bold>
+                <underline>true</underline>
+               </font>
               </property>
               <property name="text">
-               <string/>
-              </property>
-              <property name="icon">
-               <iconset>
-                <normaloff>:/plugins/oiv/config_files/png/delete.png</normaloff>:/plugins/oiv/config_files/png/delete.png</iconset>
-              </property>
-              <property name="iconSize">
-               <size>
-                <width>28</width>
-                <height>28</height>
-               </size>
+               <string>U tekent op bouwlaag:</string>
               </property>
              </widget>
             </item>
-            <item row="8" column="4">
-             <widget class="QPushButton" name="pan">
-              <property name="toolTip">
-               <string>selecteer de functie Pan...</string>
-              </property>
-              <property name="text">
-               <string/>
-              </property>
-              <property name="icon">
-               <iconset>
-                <normaloff>:/plugins/oiv/config_files/png/pan.png</normaloff>:/plugins/oiv/config_files/png/pan.png</iconset>
-              </property>
-              <property name="iconSize">
-               <size>
-                <width>28</width>
-                <height>28</height>
-               </size>
+            <item row="6" column="2" colspan="4">
+             <widget class="QLineEdit" name="oppervlakte">
+              <property name="styleSheet">
+               <string notr="true">background-color: rgb(208, 208, 208);
+border-color: rgba(255, 255, 255, 0);</string>
               </property>
              </widget>
             </item>
-            <item row="7" column="0" colspan="5">
+            <item row="8" column="0" colspan="5">
              <widget class="QLabel" name="label_7">
               <property name="sizePolicy">
                <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
@@ -106,28 +95,7 @@
               </property>
              </widget>
             </item>
-            <item row="1" column="0" colspan="5">
-             <widget class="QLabel" name="label_6">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="font">
-               <font>
-                <family>Arial</family>
-                <weight>75</weight>
-                <bold>true</bold>
-                <underline>true</underline>
-               </font>
-              </property>
-              <property name="text">
-               <string>U tekent op bouwlaag:</string>
-              </property>
-             </widget>
-            </item>
-            <item row="8" column="1">
+            <item row="9" column="1">
              <widget class="QPushButton" name="select">
               <property name="toolTip">
                <string>selecteer een object...</string>
@@ -147,7 +115,7 @@
               </property>
              </widget>
             </item>
-            <item row="8" column="2">
+            <item row="9" column="2">
              <widget class="QPushButton" name="move">
               <property name="enabled">
                <bool>true</bool>
@@ -188,15 +156,24 @@
               </property>
              </widget>
             </item>
-            <item row="4" column="2" colspan="4">
-             <widget class="QLineEdit" name="lengte">
-              <property name="styleSheet">
-               <string notr="true">background-color: rgb(208, 208, 208);
-border-color: rgba(255, 255, 255, 0);</string>
+            <item row="5" column="0" colspan="2">
+             <widget class="QLabel" name="lengte_label">
+              <property name="text">
+               <string>Lengte</string>
               </property>
              </widget>
             </item>
-            <item row="2" column="0" colspan="6">
+            <item row="7" column="2">
+             <widget class="QSpinBox" name="straal">
+              <property name="minimum">
+               <number>1</number>
+              </property>
+              <property name="maximum">
+               <number>1000</number>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="0" colspan="6">
              <widget class="QLineEdit" name="bouwlaag">
               <property name="sizePolicy">
                <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -210,7 +187,62 @@ border-color: rgba(255, 255, 255, 0);</string>
               </property>
              </widget>
             </item>
-            <item row="8" column="0">
+            <item row="5" column="2" colspan="4">
+             <widget class="QLineEdit" name="lengte">
+              <property name="styleSheet">
+               <string notr="true">background-color: rgb(208, 208, 208);
+border-color: rgba(255, 255, 255, 0);</string>
+              </property>
+             </widget>
+            </item>
+            <item row="6" column="0" colspan="2">
+             <widget class="QLabel" name="oppervlakte_label">
+              <property name="text">
+               <string>Oppervlakte</string>
+              </property>
+             </widget>
+            </item>
+            <item row="9" column="3">
+             <widget class="QPushButton" name="delete_f">
+              <property name="toolTip">
+               <string>delete object...</string>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="icon">
+               <iconset>
+                <normaloff>:/plugins/oiv/config_files/png/delete.png</normaloff>:/plugins/oiv/config_files/png/delete.png</iconset>
+              </property>
+              <property name="iconSize">
+               <size>
+                <width>28</width>
+                <height>28</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item row="9" column="4">
+             <widget class="QPushButton" name="pan">
+              <property name="toolTip">
+               <string>selecteer de functie Pan...</string>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="icon">
+               <iconset>
+                <normaloff>:/plugins/oiv/config_files/png/pan.png</normaloff>:/plugins/oiv/config_files/png/pan.png</iconset>
+              </property>
+              <property name="iconSize">
+               <size>
+                <width>28</width>
+                <height>28</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item row="9" column="0">
              <widget class="QPushButton" name="identify">
               <property name="enabled">
                <bool>true</bool>
@@ -251,42 +283,21 @@ border-color: rgba(255, 255, 255, 0);</string>
               </property>
              </widget>
             </item>
-            <item row="5" column="2" colspan="4">
-             <widget class="QLineEdit" name="oppervlakte">
-              <property name="styleSheet">
-               <string notr="true">background-color: rgb(208, 208, 208);
-border-color: rgba(255, 255, 255, 0);</string>
-              </property>
-             </widget>
-            </item>
-            <item row="4" column="0" colspan="2">
-             <widget class="QLabel" name="lengte_label">
-              <property name="text">
-               <string>Lengte</string>
-              </property>
-             </widget>
-            </item>
-            <item row="5" column="0" colspan="2">
-             <widget class="QLabel" name="oppervlakte_label">
-              <property name="text">
-               <string>Oppervlakte</string>
-              </property>
-             </widget>
-            </item>
-            <item row="6" column="2">
-             <widget class="QSpinBox" name="straal">
-              <property name="minimum">
-               <number>1</number>
-              </property>
-              <property name="maximum">
-               <number>1000</number>
-              </property>
-             </widget>
-            </item>
-            <item row="6" column="0" colspan="2">
+            <item row="7" column="0" colspan="2">
              <widget class="QLabel" name="straal_label">
               <property name="text">
                <string>Straal hulpcirkel</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="0" colspan="6">
+             <widget class="QLineEdit" name="pand_id">
+              <property name="enabled">
+               <bool>false</bool>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">background-color: rgb(208, 208, 208);
+border-color: rgba(255, 255, 255, 0);</string>
               </property>
              </widget>
             </item>
