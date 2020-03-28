@@ -18,7 +18,7 @@ class SnapPointTool(QgsMapTool):
         self.startRotate = False
         self.tempRubberBand = None
         self.vertexmarker = None
-        self.snapLayer = []
+        self.possibleSnapFeatures = []
         self.setCursor(Qt.CrossCursor)
 
     def canvasReleaseEvent(self, event):
@@ -91,62 +91,30 @@ class SnapPointTool(QgsMapTool):
             self.tempRubberBand.movePoint(mapPt)
 
     def snap_to_point(self, pos, layerPt):
-        """snap the clicked point to another snapping layer feature"""
-        snapPoints = []
-        distance = []
-        snapPoint = None
-        val = 0
-        idx = None
-        if self.vertexmarker is None:
-            self.vertexmarker = QgsVertexMarker(self.canvas)
-            self.vertexmarker.setColor(QColor(255, 0, 255))
-            self.vertexmarker.setIconSize(5)
-            self.vertexmarker.setIconType(QgsVertexMarker.ICON_X) # or ICON_CROSS, ICON_X
-            self.vertexmarker.setPenWidth(5)
-            self.vertexmarker.show()
-        #berken snap toleratie en extent (rechthoek waarbinnen gesnapt kan worden)
+        """calculat if there is a point to snap to within the tolerance"""
         tolerance = pow(self.calcTolerance(pos), 2)
-        extent = self.calcExtent(layerPt, tolerance)
-        #haal features op waarop gesnapt kan worden
-        request = QgsFeatureRequest()
-        request.setFilterRect(extent)
-        request.setFlags(QgsFeatureRequest.ExactIntersect)
-        for ilayer in self.snapLayer:
-            try:
-                index = None
-                nearestId = None
-                ifeature = None
-                closestSegm = None
-                #bereken voor elke snap laag de dichtsbijzinde feature
-                index = QgsSpatialIndex(ilayer.getFeatures(request))
-                nearestId = index.nearestNeighbor(layerPt, 2)[0]
-                ifeature = next(ilayer.getFeatures(QgsFeatureRequest(nearestId)))
-                #bereken per feature het dichtsbijzijnde lijn segment
-                closestSegm = ifeature.geometry().closestSegmentWithContext(layerPt)
-                #als de afstand tot het lijnsegment kleiner is als de tolerantie voeg toe als snappunt
-                if closestSegm[0] is not None and closestSegm[0] < tolerance:
-                    distance.append(closestSegm[0])
-                    snapPoints.append(closestSegm[1])
-                else:
-                    distance.append(tolerance + 1)
-                    snapPoints.append('')
-            except: # pylint: disable=bare-except
-                pass
-        #bereken het dichtsbijzijnde snappunt voor alle snap lagen
-        if distance:
-            val, idx = min((val, idx) for (idx, val) in enumerate(distance))
-        if val <= tolerance and val != 0:
-            transformLayer = self.snapLayer[0]
-            snapPoint = self.toMapCoordinates(transformLayer, snapPoints[idx])
-        return snapPoint
+        minDist = tolerance
+        snapPoint = None
 
-    def calcExtent(self, layerPt, tolerance):
-        """calculate snap extent"""
-        extent = QgsRectangle(layerPt.x() - tolerance,
-                              layerPt.y() - tolerance,
-                              layerPt.x() + tolerance,
-                              layerPt.y() + tolerance)
-        return extent
+        if self.vertexmarker is None:
+            self.init_vertexmarker()
+
+        for geom in self.possibleSnapFeatures:
+            closestSegm = geom.closestSegmentWithContext(layerPt)
+            if closestSegm[0] < minDist:
+                minDist = closestSegm[0]
+                snapPoint = closestSegm[1]
+
+        if snapPoint:
+            return snapPoint
+
+    def init_vertexmarker(self):
+        self.vertexmarker = QgsVertexMarker(self.canvas)
+        self.vertexmarker.setColor(QColor(255, 0, 255))
+        self.vertexmarker.setIconSize(8)
+        self.vertexmarker.setIconType(QgsVertexMarker.ICON_X) # or ICON_CROSS, ICON_X
+        self.vertexmarker.setPenWidth(5)
+        self.vertexmarker.show()
 
     def calcTolerance(self, pos):
         """calculate snap tolerance"""

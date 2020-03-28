@@ -29,7 +29,7 @@ from qgis.PyQt.QtCore import Qt
 from qgis.core import QgsFeatureRequest, QgsGeometry, QgsFeature
 from qgis.utils import iface
 
-from .tools.utils import getlayer_byname, get_draw_layer_attr, check_layer_type, write_layer, user_input_label, nearest_neighbor
+from .tools.utils import getlayer_byname, get_draw_layer_attr, check_layer_type, write_layer, user_input_label, nearest_neighbor, read_config_file
 from .tools.identifyTool import IdentifyGeometryTool
 
 from .oiv_stackwidget import oivStackWidget
@@ -126,7 +126,7 @@ class oivObjectTekenWidget(QDockWidget, FORM_CLASS):
                 if layerType == "Point":
                     self.moveLayerNames.append(layerName)
 
-                actionList = self.read_config_file(csvPath)
+                actionList = read_config_file(csvPath)
                 self.ini_action(actionList, layerName)
 
     def ini_action(self, actionList, run_layer):
@@ -141,21 +141,6 @@ class oivObjectTekenWidget(QDockWidget, FORM_CLASS):
                 strButton.setToolTip(buttonName)
                 #geef met de signal ook mee welke knop er is geklikt -> nr
                 strButton.clicked.connect(lambda dummy='dummyvar', rlayer=run_layer, who=buttonNr: self.run_tekenen(dummy, rlayer, who))
-
-    # Read lines from input file and convert to list
-    def read_config_file(self, file):
-        """Read lines from input file and convert to list"""
-        configList = []
-        basepath = os.path.dirname(os.path.realpath(__file__))
-
-        with open(basepath + file, 'r') as inputFile:
-            lines = inputFile.read().splitlines()
-
-        for line in lines:
-            configList.append(line.split(','))
-        inputFile.close()
-
-        return configList
 
     def activatePan(self):
         self.iface.actionPan().trigger()

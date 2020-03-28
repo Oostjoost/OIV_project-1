@@ -30,7 +30,7 @@ from qgis.utils import iface
 
 from .tools.mapTool import CaptureTool
 from .tools.identifyTool import SelectTool
-from .tools.utils import check_layer_type, get_draw_layer_attr, getlayer_byname, write_layer, user_input_label, nearest_neighbor
+from .tools.utils import check_layer_type, get_draw_layer_attr, getlayer_byname, write_layer, user_input_label, nearest_neighbor, read_config_file
 from .oiv_stackwidget import oivStackWidget
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
@@ -66,14 +66,7 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
 
         self.iface = iface
         self.stackwidget = oivStackWidget()
-
-        self.lengte_label.setVisible(False)
-        self.lengte.setVisible(False)
-        self.straal_label.setVisible(False)
-        self.straal.setVisible(False)        
-        self.oppervlakte_label.setVisible(False)
-        self.oppervlakte.setVisible(False)
-
+        self.set_lengte_oppervlakte_visibility(False, False, False)
         self.move.clicked.connect(self.run_move_point)
         self.identify.clicked.connect(self.run_edit_tool)
         self.select.clicked.connect(self.run_select_tool)
@@ -96,7 +89,7 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
                 if layerType == "Point":
                     self.moveLayerNames.append(layerName)
 
-                actionList = self.read_config_file(csvPath)
+                actionList = read_config_file(csvPath)
                 self.ini_action(actionList, layerName)
 
     def ini_action(self, actionList, run_layer):
@@ -111,20 +104,6 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
                 strButton.setToolTip(buttonName)
                 #geef met de signal ook mee welke knop er is geklikt -> nr
                 strButton.clicked.connect(lambda dummy='dummyvar', rlayer=run_layer, who=buttonNr: self.run_tekenen(dummy, rlayer, who))
-
-    def read_config_file(self, file):
-        """Read lines from input file and convert to list"""
-        configList = []
-        basepath = os.path.dirname(os.path.realpath(__file__))
-
-        with open(basepath + file, 'r') as inputFile:
-            lines = inputFile.read().splitlines()
-
-        for line in lines:
-            configList.append(line.split(','))
-        inputFile.close()
-
-        return configList
 
     def activatePan(self):
         """trigger pan function to loose other functions"""
@@ -227,11 +206,9 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
 
     def get_possible_snapFeatures(self):
         possibleSnapFeatures = []
-        snapLayer = []
         bouwlaagIds = []
         for name in self.snapLayerNames:
             lyr = getlayer_byname(name)
-            snapLayer.append(lyr)
             if name == 'BAG panden':
                 request = QgsFeatureRequest().setFilterExpression('"identificatie" = ' + self.pand_id.text())
                 tempFeature = next(lyr.getFeatures(request))
@@ -248,7 +225,15 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
                     featureIt = lyr.getFeatures(request)
                     for feat in featureIt:
                         possibleSnapFeatures.append(feat.geometry())
-        return snapLayer, possibleSnapFeatures
+        return possibleSnapFeatures
+
+    def set_lengte_oppervlakte_visibility(self, lengteTF, straalTF, oppTF):
+        self.lengte_label.setVisible(lengteTF)
+        self.lengte.setVisible(lengteTF)
+        self.straal.setVisible(straalTF)
+        self.straal_label.setVisible(straalTF)
+        self.oppervlakte_label.setVisible(oppTF)
+        self.oppervlakte.setVisible(oppTF)
 
     def run_tekenen(self, dummy, run_layer, feature_id):
         """activate the right draw action"""
@@ -260,53 +245,36 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         #wat is the parentlayer, uitlezen vanuit de config file
         self.parentlayer_name = get_draw_layer_attr(run_layer, "parent_layer", self.read_config)
         #aan welke lagen kan worden gesnapt?
-        snapLayer, possibleSnapFeatures = self.get_possible_snapFeatures()
+        possibleSnapFeatures = self.get_possible_snapFeatures()
 
         if self.draw_layer_type == "Point":
             self.tekenTool.snapPt = None
             self.tekenTool.snapping = False
             self.tekenTool.startRotate = False
-            self.tekenTool.snapLayer = snapLayer
+            self.tekenTool.possibleSnapFeatures = possibleSnapFeatures
             if self.identifier in self.snappicto:
                 self.tekenTool.snapping = True
             self.tekenTool.layer = self.draw_layer
             self.canvas.setMapTool(self.tekenTool)
-            self.lengte_label.setVisible(False)
-            self.lengte.setVisible(False)
-            self.straal.setVisible(False)
-            self.straal_label.setVisible(False)
-            self.oppervlakte_label.setVisible(False)
-            self.oppervlakte.setVisible(False) 
+            self.set_lengte_oppervlakte_visibility(False, False, False)
             self.tekenTool.onGeometryAdded = self.place_feature
         elif self.draw_layer_type == "Line":
             self.lineTool.layer = self.draw_layer
-            self.lineTool.snapLayer = snapLayer
             self.lineTool.possibleSnapFeatures = possibleSnapFeatures
             self.lineTool.canvas = self.canvas
             self.lineTool.onGeometryAdded = self.place_feature
             self.lineTool.captureMode = 1
             self.canvas.setMapTool(self.lineTool)
-            self.lengte_label.setVisible(True)
-            self.lengte.setVisible(True)
-            self.straal.setVisible(True)
-            self.straal_label.setVisible(True)            
-            self.oppervlakte_label.setVisible(False)
-            self.oppervlakte.setVisible(False)
+            self.set_lengte_oppervlakte_visibility(True, True, False)
             self.lineTool.parent = self
         elif self.draw_layer_type == "Polygon":
             self.polygonTool.layer = self.draw_layer
-            self.polygonTool.snapLayer = snapLayer
             self.polygonTool.possibleSnapFeatures = possibleSnapFeatures
             self.polygonTool.canvas = self.canvas
             self.polygonTool.onGeometryAdded = self.place_feature
             self.polygonTool.captureMode = 2
             self.canvas.setMapTool(self.polygonTool)
-            self.lengte_label.setVisible(True)
-            self.lengte.setVisible(True)
-            self.straal.setVisible(True)
-            self.straal_label.setVisible(True)             
-            self.oppervlakte_label.setVisible(True)
-            self.oppervlakte.setVisible(True)
+            self.set_lengte_oppervlakte_visibility(True, True, True)
             self.polygonTool.parent = self
 
     def place_feature(self, points, snapAngle):

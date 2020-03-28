@@ -1,5 +1,6 @@
 """utils that are requested from the core plugin"""
-from qgis.core import QgsProject, QgsWkbTypes, QgsSpatialIndex, QgsFeatureRequest
+import os
+from qgis.core import QgsProject, QgsWkbTypes, QgsSpatialIndex, QgsFeatureRequest, QgsRectangle
 from qgis.PyQt.QtWidgets import QInputDialog, QLineEdit
 
 def getlayer_byname(layername):
@@ -100,3 +101,17 @@ def refresh_layers(iface):
     """refresh all layers on the canvas"""
     for layer in iface.mapCanvas().layers():
         layer.triggerRepaint()
+
+def read_config_file(file):
+    """Read lines from input file and convert to list"""
+    configList = []
+    basepath = os.path.dirname(os.path.realpath(__file__))
+
+    with open(basepath + file, 'r') as inputFile:
+        lines = inputFile.read().splitlines()
+
+    for line in lines:
+        configList.append(line.split(','))
+    inputFile.close()
+
+    return configList

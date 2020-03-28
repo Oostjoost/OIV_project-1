@@ -29,7 +29,6 @@ class CaptureTool(QgsMapTool):
         self.snapFeature = []
         self.possibleSnapFeatures = []
         self.vertexmarker = None
-        self.snapLayer = []
         self.parent = None
         self.shiftPressed = False
         self.setCursor(Qt.CrossCursor)
@@ -93,8 +92,10 @@ class CaptureTool(QgsMapTool):
             self.vertexmarker.show()
 
     def snap_to_point(self, pos, layerPt):
-        #index = QgsSpatialIndex(self.possibleSnapFeatures)
+        """calculat if there is a point to snap to within the tolerance"""
         tolerance = pow(self.calcTolerance(pos), 2)
+        self.snapPt = None
+        self.snapFeature = []
         minDist = tolerance
         snapPoints = []
         counter = 0
@@ -134,14 +135,6 @@ class CaptureTool(QgsMapTool):
                 self.snapFeature.extend((None, None, None))
 
             return snapPoint
-
-    def calcExtent(self, layerPt, tolerance):
-        """bereken snap extent"""
-        extent = QgsRectangle(layerPt.x() - tolerance,
-                              layerPt.y() - tolerance,
-                              layerPt.x() + tolerance,
-                              layerPt.y() + tolerance)
-        return extent
 
     def calcTolerance(self, pos):
         """calculate the tolerance of snapping"""
@@ -220,11 +213,11 @@ class CaptureTool(QgsMapTool):
         borderColor.setAlphaF(0.5)
         fillColor = QColor("blue")
         fillColor.setAlphaF(0)
-        self.roundRubberBand.setFillColor(fillColor)    
-        self.roundRubberBand.setStrokeColor(borderColor)        
+        self.roundRubberBand.setFillColor(fillColor)
+        self.roundRubberBand.setStrokeColor(borderColor)
         self.roundRubberBand.setLineStyle(Qt.DotLine)
-        self.roundRubberBand.show() 
-        self.parent.straal.valueChanged.connect(self.roundrubberband_change_straal)        
+        self.roundRubberBand.show()
+        self.parent.straal.valueChanged.connect(self.roundrubberband_change_straal)
         self.capturing = True
 
     def bandType(self):
@@ -263,7 +256,7 @@ class CaptureTool(QgsMapTool):
         if self.snapPt is not None:
             if self.snapFeature[2] is not None and self.snapFeature[1] is not None:
                 polygon = self.snapFeature[2]
-                clickedPt = polygon[self.snapFeature[1]]
+                clickedPt = polygon[self.snapFeature[1]] #vertexnr.
             else:
                 clickedPt = self.toLayerCoordinates(self.layer, canvasPoint)
             layerPt = self.toLayerCoordinates(self.layer, self.snapPt)
@@ -324,13 +317,11 @@ class CaptureTool(QgsMapTool):
         geom_cString = test.toCircularString()
         geom_from_curve = QgsGeometry(geom_cString)
         self.roundRubberBand.setToGeometry(geom_from_curve)
-        #self.snapLayer.append(self.roundRubberBand)
         self.possibleSnapFeatures.append(self.roundRubberBand.asGeometry())
         self.perpRubberBand.addPoint(QgsPointXY(x1, y1))
         self.perpRubberBand.addPoint(QgsPointXY(x2, y2))
         self.perpRubberBand.show()
         #voeg de rubberband toe als mogelijke snap laag
-        #self.snapLayer.append(self.perpRubberBand)
         self.possibleSnapFeatures.append(self.perpRubberBand.asGeometry())
         #als het een hoek betreft moeten er 2 haakse lijnen worden getekend
         if self.snapFeature is None or self.snapFeature[2] is None:
