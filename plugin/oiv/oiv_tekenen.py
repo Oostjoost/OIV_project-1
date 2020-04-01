@@ -7,8 +7,7 @@
         begin                : 2019-08-15
         git sha              : $Format:%H$
         copyright            : (C) 2019 by Joost Deen
-        email                : jdeen@vrnhn.nl
-        versie               : 2.9.93
+        email                : jdeen@safetyct.com
  ***************************************************************************/
 /***************************************************************************
  *                                                                         *
@@ -30,6 +29,7 @@ from qgis.utils import iface
 
 from .tools.mapTool import CaptureTool
 from .tools.identifyTool import SelectTool
+from .tools.snappointTool import SnapPointTool
 from .tools.utils import check_layer_type, get_draw_layer_attr, getlayer_byname, write_layer, user_input_label, nearest_neighbor, read_config_file
 from .oiv_stackwidget import oivStackWidget
 
@@ -43,17 +43,17 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
     canvas = None
     tekenTool = None
     identifier = None
-    parentlayer_name = None
-    draw_layer_type = None
-    draw_layer = None
-    editable_layers = []
+    parentLayerName = None
+    drawLayerType = None
+    drawLayer = None
+    editableLayers = []
     objectwidget = None
     lineTool = None
     polygonTool = None
     moveTool = None
     selectTool = None
     #id van pictogram
-    snappicto = ['1', '10', '32', '47', '148', '149', '150', '151', '152',\
+    snapPicto = ['1', '10', '32', '47', '148', '149', '150', '151', '152',\
                  '1011', 'Algemeen', 'Voorzichtig', 'Waarschuwing', 'Gevaar'] 
     moveLayerNames = []
     snapLayerNames = ["BAG panden", "Bouwlagen", \
@@ -63,16 +63,21 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         """Constructor."""
         super(oivTekenWidget, self).__init__(parent)
         self.setupUi(self)
-
         self.iface = iface
         self.stackwidget = oivStackWidget()
+        self.initUI()
+
+    def initUI(self):
+        """intitiate the UI elemets on the widget"""
         self.set_lengte_oppervlakte_visibility(False, False, False)
+        #connect buttons to the action
         self.move.clicked.connect(self.run_move_point)
         self.identify.clicked.connect(self.run_edit_tool)
         self.select.clicked.connect(self.run_select_tool)
         self.delete_f.clicked.connect(self.run_delete_tool)
         self.pan.clicked.connect(self.activatePan)
         self.terug.clicked.connect(self.close_teken_show_object)
+        self.connect_buttons(self.read_config)
 
     def connect_buttons(self, configLines):
         """connect button and signals to the real action run"""
@@ -82,7 +87,7 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
             csvPath = line[1]
 
             if csvPath:
-                self.editable_layers.append(layerName)
+                self.editableLayers.append(layerName)
                 layer = getlayer_byname(layerName)
                 layerType = check_layer_type(layer)
 
@@ -148,8 +153,8 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         self.selectTool.geomSelected.connect(self.delete_feature)
 
     def delete_feature(self, ilayer, ifeature):
-        """controleer of het een feature betreft binnenn de lijst editable_layers"""
-        if ilayer.name() in self.editable_layers:
+        """controleer of het een feature betreft binnenn de lijst editableLayers"""
+        if ilayer.name() in self.editableLayers:
             self.iface.setActiveLayer(ilayer)
             ids = []
             ids.append(ifeature.id())
@@ -239,27 +244,27 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         """activate the right draw action"""
         #welke pictogram is aangeklikt en wat is de bijbehorende tekenlaag
         self.identifier = feature_id
-        self.draw_layer = getlayer_byname(run_layer)
+        self.drawLayer = getlayer_byname(run_layer)
         #betreft het een punt, lijn of polygoon laag?
-        self.draw_layer_type = check_layer_type(self.draw_layer)
+        self.drawLayerType = check_layer_type(self.drawLayer)
         #wat is the parentlayer, uitlezen vanuit de config file
-        self.parentlayer_name = get_draw_layer_attr(run_layer, "parent_layer", self.read_config)
+        self.parentLayerName = get_draw_layer_attr(run_layer, "parent_layer", self.read_config)
         #aan welke lagen kan worden gesnapt?
         possibleSnapFeatures = self.get_possible_snapFeatures()
 
-        if self.draw_layer_type == "Point":
+        if self.drawLayerType == "Point":
             self.tekenTool.snapPt = None
             self.tekenTool.snapping = False
             self.tekenTool.startRotate = False
             self.tekenTool.possibleSnapFeatures = possibleSnapFeatures
-            if self.identifier in self.snappicto:
+            if self.identifier in self.snapPicto:
                 self.tekenTool.snapping = True
-            self.tekenTool.layer = self.draw_layer
+            self.tekenTool.layer = self.drawLayer
             self.canvas.setMapTool(self.tekenTool)
             self.set_lengte_oppervlakte_visibility(False, False, False)
             self.tekenTool.onGeometryAdded = self.place_feature
-        elif self.draw_layer_type == "Line":
-            self.lineTool.layer = self.draw_layer
+        elif self.drawLayerType == "Line":
+            self.lineTool.layer = self.drawLayer
             self.lineTool.possibleSnapFeatures = possibleSnapFeatures
             self.lineTool.canvas = self.canvas
             self.lineTool.onGeometryAdded = self.place_feature
@@ -267,8 +272,8 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
             self.canvas.setMapTool(self.lineTool)
             self.set_lengte_oppervlakte_visibility(True, True, False)
             self.lineTool.parent = self
-        elif self.draw_layer_type == "Polygon":
-            self.polygonTool.layer = self.draw_layer
+        elif self.drawLayerType == "Polygon":
+            self.polygonTool.layer = self.drawLayer
             self.polygonTool.possibleSnapFeatures = possibleSnapFeatures
             self.polygonTool.canvas = self.canvas
             self.polygonTool.onGeometryAdded = self.place_feature
@@ -282,16 +287,16 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         childFeature = QgsFeature()
         self.iface.setActiveLayer(self.draw_layer)
         #converteer lijst van punten naar QgsGeometry, afhankelijk van soort geometrie
-        if self.draw_layer_type == "Point":
+        if self.drawLayerType == "Point":
             childFeature.setGeometry(QgsGeometry.fromPointXY(points))
             geom = points
-        elif self.draw_layer_type == "Line":
+        elif self.drawLayerType == "Line":
             childFeature.setGeometry(QgsGeometry.fromPolylineXY(points))
             geom = points[0]
-        elif self.draw_layer_type == "Polygon":
+        elif self.drawLayerType == "Polygon":
             childFeature.setGeometry(QgsGeometry.fromPolygonXY([points]))
             geom = points[0]
-        parentlayer = getlayer_byname(self.parentlayer_name)
+        parentlayer = getlayer_byname(self.parentLayerName)
         #vindt dichtsbijzijnde parentfeature om aan te koppelen
         dummy, parentId = nearest_neighbor(self.iface, parentlayer, geom)
         #foutafhandeling ivm als er geen parentfeature is gevonden binnen het kaartvenster in QGIS

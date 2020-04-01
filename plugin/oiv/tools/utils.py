@@ -105,9 +105,12 @@ def refresh_layers(iface):
 def read_config_file(file):
     """Read lines from input file and convert to list"""
     configList = []
-    basepath = os.path.dirname(os.path.realpath(__file__))
+    basepath = os.path.dirname(__file__)
 
-    with open(basepath + file, 'r') as inputFile:
+    if basepath:
+        os.chdir(basepath)
+
+    with open("../" + file, "r") as inputFile:
         lines = inputFile.read().splitlines()
 
     for line in lines:
@@ -115,3 +118,23 @@ def read_config_file(file):
     inputFile.close()
 
     return configList
+
+def connect_buttons(self, configLines):
+    """connect buttons and signals to the real action run"""
+    #skip first line because of header
+    editableLayerNames = []
+    moveLayerNames = []
+    for line in configLines[1:]:
+        layerName = line[0]
+        csvPath = line[1]
+
+        if csvPath:
+            editableLayerNames.append(layerName)
+            layer = getlayer_byname(layerName)
+            layerType = check_layer_type(layer)
+
+            if layerType == "Point":
+                moveLayerNames.append(layerName)
+
+            actionList = read_config_file(csvPath)
+            self.ini_action(actionList, layerName)

@@ -218,7 +218,8 @@ class oivObjectWidget(QDockWidget, FORM_CLASS):
         self.iface.addDockWidget(Qt.RightDockWidgetArea, self.tekenwidget)
         self.close()
         self.tekenwidget.show()
-        self.tekenwidget.connect_buttons(self.read_config)
+        self.tekenwidget.initUI()
+        #self.tekenwidget.connect_buttons(self.read_config)
 
     def openBagviewer(self):
         """open url based on BAG pand_id, i.v.m. terugmelden"""
