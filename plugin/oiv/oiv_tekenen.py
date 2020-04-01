@@ -30,7 +30,7 @@ from qgis.utils import iface
 from .tools.mapTool import CaptureTool
 from .tools.identifyTool import SelectTool
 from .tools.snappointTool import SnapPointTool
-from .tools.utils import check_layer_type, get_draw_layer_attr, getlayer_byname, write_layer, user_input_label, nearest_neighbor, read_config_file
+from .tools.utils import check_layer_type, get_draw_layer_attr, getlayer_byname, write_layer, user_input_label, nearest_neighbor, read_config_file, get_actions, get_possible_snapFeatures
 from .oiv_stackwidget import oivStackWidget
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
@@ -38,7 +38,8 @@ FORM_CLASS, _ = uic.loadUiType(os.path.join(
 
 class oivTekenWidget(QDockWidget, FORM_CLASS):
     """Organize all draw features on the map"""
-    read_config = None
+
+    configFileBouwlaag = None
     iface = None
     canvas = None
     tekenTool = None
@@ -77,38 +78,24 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         self.delete_f.clicked.connect(self.run_delete_tool)
         self.pan.clicked.connect(self.activatePan)
         self.terug.clicked.connect(self.close_teken_show_object)
-        self.connect_buttons(self.read_config)
+        self.configFileBouwlaag = read_config_file("/config_files/csv/config_bouwlaag.csv", None)        
+        actionList, self.editableLayerNames, self.moveLayerNames = get_actions(self.configFileBouwlaag)
+        self.initActions(actionList)
 
-    def connect_buttons(self, configLines):
-        """connect button and signals to the real action run"""
-        #skip first line because of header
-        for line in configLines[1:]:
-            layerName = line[0]
-            csvPath = line[1]
-
-            if csvPath:
-                self.editableLayers.append(layerName)
-                layer = getlayer_byname(layerName)
-                layerType = check_layer_type(layer)
-
-                if layerType == "Point":
-                    self.moveLayerNames.append(layerName)
-
-                actionList = read_config_file(csvPath)
-                self.ini_action(actionList, layerName)
-
-    def ini_action(self, actionList, run_layer):
+    def initActions(self, actionList):
         """connect all the buttons to the action"""
-        for action in actionList:
-            buttonNr = action[0]
-            buttonName = str(action[1].lower())
-            strButton = self.findChild(QPushButton, buttonName)
+        for lyr in actionList:
+            for action in lyr:
+                runLayerName = action[0]
+                buttonNr = action[1]
+                buttonName = str(action[2].lower())
+                strButton = self.findChild(QPushButton, buttonName)
 
-            if strButton:
-                #set tooltip per buttonn
-                strButton.setToolTip(buttonName)
-                #geef met de signal ook mee welke knop er is geklikt -> nr
-                strButton.clicked.connect(lambda dummy='dummyvar', rlayer=run_layer, who=buttonNr: self.run_tekenen(dummy, rlayer, who))
+                if strButton:
+                    #set tooltip per buttonn
+                    strButton.setToolTip(buttonName)
+                    #geef met de signal ook mee welke knop er is geklikt -> nr
+                    strButton.clicked.connect(lambda dummy='dummyvar', rlayer=runLayerName, who=buttonNr: self.run_tekenen(dummy, rlayer, who))
 
     def activatePan(self):
         """trigger pan function to loose other functions"""
@@ -120,7 +107,7 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
             self.selectTool.geomSelected.disconnect()
         except: # pylint: disable=bare-except
             pass
-        self.selectTool.read_config = self.read_config
+        self.selectTool.configFileBouwlaag = self.configFileBouwlaag
         self.canvas.setMapTool(self.selectTool)
         self.selectTool.geomSelected.connect(self.edit_attribute)
 
@@ -148,7 +135,7 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
             self.selectTool.geomSelected.disconnect()
         except: # pylint: disable=bare-except
             pass
-        self.selectTool.read_config = self.read_config
+        self.selectTool.configFileBouwlaag = self.configFileBouwlaag
         self.canvas.setMapTool(self.selectTool)
         self.selectTool.geomSelected.connect(self.delete_feature)
 
@@ -209,29 +196,6 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
             moveLayer.commitChanges()        
         self.activatePan()
 
-    def get_possible_snapFeatures(self):
-        possibleSnapFeatures = []
-        bouwlaagIds = []
-        for name in self.snapLayerNames:
-            lyr = getlayer_byname(name)
-            if name == 'BAG panden':
-                request = QgsFeatureRequest().setFilterExpression('"identificatie" = ' + self.pand_id.text())
-                tempFeature = next(lyr.getFeatures(request))
-                possibleSnapFeatures.append(tempFeature.geometry())
-            elif name == 'Bouwlagen':
-                request = QgsFeatureRequest().setFilterExpression('"pand_id" = ' + self.pand_id.text())
-                featureIt = lyr.getFeatures(request)
-                for feat in featureIt:
-                    bouwlaagIds.append(feat["id"])
-                    possibleSnapFeatures.append(feat.geometry())
-            elif bouwlaagIds:
-                for bid in bouwlaagIds:
-                    request = QgsFeatureRequest().setFilterExpression('"bouwlaag_id" = ' + str(bid))
-                    featureIt = lyr.getFeatures(request)
-                    for feat in featureIt:
-                        possibleSnapFeatures.append(feat.geometry())
-        return possibleSnapFeatures
-
     def set_lengte_oppervlakte_visibility(self, lengteTF, straalTF, oppTF):
         self.lengte_label.setVisible(lengteTF)
         self.lengte.setVisible(lengteTF)
@@ -245,12 +209,10 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         #welke pictogram is aangeklikt en wat is de bijbehorende tekenlaag
         self.identifier = feature_id
         self.drawLayer = getlayer_byname(run_layer)
-        #betreft het een punt, lijn of polygoon laag?
         self.drawLayerType = check_layer_type(self.drawLayer)
-        #wat is the parentlayer, uitlezen vanuit de config file
-        self.parentLayerName = get_draw_layer_attr(run_layer, "parent_layer", self.read_config)
+        self.parentLayerName = get_draw_layer_attr(run_layer, "parent_layer", self.configFileBouwlaag)
         #aan welke lagen kan worden gesnapt?
-        possibleSnapFeatures = self.get_possible_snapFeatures()
+        possibleSnapFeatures = get_possible_snapFeatures(self.snapLayerNames)
 
         if self.drawLayerType == "Point":
             self.tekenTool.snapPt = None
@@ -315,16 +277,16 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         """get the aatributes that are obligated"""
         input_id = self.identifier
         #haal de vraag voor de inputdialog vanuit de config file
-        question = get_draw_layer_attr(self.draw_layer.name(), "question", self.read_config)
+        question = get_draw_layer_attr(self.draw_layer.name(), "question", self.configFileBouwlaag)
         #is de label verplicht of niet?
-        label_req = get_draw_layer_attr(self.draw_layer.name(), "label_required", self.read_config)
+        label_req = get_draw_layer_attr(self.draw_layer.name(), "label_required", self.configFileBouwlaag)
         input_label = user_input_label(label_req, question)
         #attribuut naam ophalen van de foreignkey
         if input_label != 'Cancel':
             input_fk = foreignKey
-            attr_id = get_draw_layer_attr(self.draw_layer.name(), "identifier", self.read_config)
-            attr_label = get_draw_layer_attr(self.draw_layer.name(), "input_label", self.read_config)
-            attr_fk = get_draw_layer_attr(self.draw_layer.name(), "foreign_key", self.read_config)
+            attr_id = get_draw_layer_attr(self.draw_layer.name(), "identifier", self.configFileBouwlaag)
+            attr_label = get_draw_layer_attr(self.draw_layer.name(), "input_label", self.configFileBouwlaag)
+            attr_fk = get_draw_layer_attr(self.draw_layer.name(), "foreign_key", self.configFileBouwlaag)
             fields = self.draw_layer.fields()
             #initialiseer de childFeature
             childFeature.initAttributes(fields.count())
@@ -360,6 +322,12 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
             del self.stackwidget
         except: # pylint: disable=bare-except
             pass
+        for widget in self.children():
+            if isinstance(widget, QPushButton):
+                try:
+                    widget.clicked.disconnect()
+                except: # pylint: disable=bare-except
+                    pass
         self.close()
         self.objectwidget.show()
         del self

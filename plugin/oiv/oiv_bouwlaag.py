@@ -30,7 +30,7 @@ from qgis.utils import iface
 from qgis.core import QgsFeature, QgsGeometry, QgsFeatureRequest
 
 from .tools.identifyTool import SelectTool
-from .tools.utils import getlayer_byname, get_draw_layer_attr, write_layer, set_layer_substring, user_input_label
+from .tools.utils import getlayer_byname, get_draw_layer_attr, write_layer, set_layer_substring, user_input_label, get_possible_snapFeatures
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'oiv_bouwlaag_widget.ui'))
@@ -64,10 +64,7 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
         self.label1.setVisible(False)
         self.label2.setVisible(False)
         self.label3.setVisible(False)
-        self.lengte_label.setVisible(False)
-        self.lengte.setVisible(False)
-        self.oppervlakte_label.setVisible(False)
-        self.oppervlakte.setVisible(False)
+        self.set_lengte_oppervlakte_visibility(False, False, False)
         self.bouwlaag_max.setVisible(False)
         self.bouwlaag.setVisible(False)
         self.copy.setVisible(False)
@@ -100,26 +97,27 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
         self.copy.setVisible(True)
         #connect signal to slot
         self.bouwlaag.currentIndexChanged.connect(self.set_layer_subset_bouwlaag)
-        self.selectTool.geomSelected.connect(self.copy_bag_bouwlaag)        
+        self.selectTool.geomSelected.connect(self.copy_bag_bouwlaag)
+
+    def set_lengte_oppervlakte_visibility(self, lengteTF, straalTF, oppTF):
+        self.lengte_label.setVisible(lengteTF)
+        self.lengte.setVisible(lengteTF)
+        self.straal.setVisible(straalTF)
+        self.straal_label.setVisible(straalTF)
+        self.oppervlakte_label.setVisible(oppTF)
+        self.oppervlakte.setVisible(oppTF)
 
     def run_bouwlaag_tekenen(self):
         """draw a floor with the basic functionality of QGIS"""
-        snapLayer = []
-        for name in self.snapLayerNames:
-            lyr = getlayer_byname(name)
-            snapLayer.append(lyr)
-        self.draw_layer = getlayer_byname('Bouwlagen')
-        self.polygonTool.layer = self.draw_layer
-        self.polygonTool.snapLayer = snapLayer
+        possibleSnapFeatures = get_possible_snapFeatures(self.snapLayerNames)
+        layer = getlayer_byname('Bouwlagen')
+        self.polygonTool.layer = layer
+        self.polygonTool.possibleSnapFeatures = possibleSnapFeatures
         self.polygonTool.canvas = self.canvas
         self.polygonTool.onGeometryAdded = self.draw_feature
         self.polygonTool.captureMode = 2
         self.canvas.setMapTool(self.polygonTool)
-
-        self.lengte_label.setVisible(True)
-        self.lengte.setVisible(True)
-        self.oppervlakte_label.setVisible(True)
-        self.oppervlakte.setVisible(True)
+        self.set_lengte_oppervlakte_visibility(True, True, True)
         self.polygonTool.parent = self
 
     def run_select_bouwlaag(self):
@@ -184,7 +182,7 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
         input_label = user_input_label(label_req, question)
         attr_fk    = get_draw_layer_attr(layerName, "foreign_key", self.read_config)
         attr_label = get_draw_layer_attr(layerName, "input_label", self.read_config)
-        self.iface.setActiveLayer(self.draw_layer)
+        self.iface.setActiveLayer(layer)
         #construct QgsFeature to save
         for i in range(minBouwlaag, maxBouwlaag + 1):
             if i != 0:
@@ -232,7 +230,7 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
             for i in range(minBouwlaag, maxBouwlaag + 1):
                 if i != 0:
                     childFeature.setGeometry(ifeature.geometry())
-                    fields = layer.fields()        
+                    fields = layer.fields()
                     childFeature.initAttributes(fields.count())
                     childFeature.setFields(fields)
                     childFeature[attr_fk] = self.objectId
@@ -270,7 +268,7 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
 
     def bouwlagen_to_combobox(self):
         """add existing floors to the comboBox of the "bouwlaagdockwidget"""
-        self.bouwlaag.blockSignals(True)    
+        self.bouwlaag.blockSignals(True)
         self.bouwlaag.clear()
         for i in range(len(self.bouwlaagList) + 1):
             if i == 0:

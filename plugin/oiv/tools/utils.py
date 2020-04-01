@@ -102,10 +102,13 @@ def refresh_layers(iface):
     for layer in iface.mapCanvas().layers():
         layer.triggerRepaint()
 
-def read_config_file(file):
+def read_config_file(file, layerName):
     """Read lines from input file and convert to list"""
     configList = []
     basepath = os.path.dirname(__file__)
+
+    if layerName is None:
+        layerName = []
 
     if basepath:
         os.chdir(basepath)
@@ -114,16 +117,17 @@ def read_config_file(file):
         lines = inputFile.read().splitlines()
 
     for line in lines:
-        configList.append(line.split(','))
+        configList.append(layerName + line.split(','))
     inputFile.close()
 
     return configList
 
-def connect_buttons(self, configLines):
+def get_actions(configLines):
     """connect buttons and signals to the real action run"""
     #skip first line because of header
     editableLayerNames = []
     moveLayerNames = []
+    actionList = []
     for line in configLines[1:]:
         layerName = line[0]
         csvPath = line[1]
@@ -136,5 +140,30 @@ def connect_buttons(self, configLines):
             if layerType == "Point":
                 moveLayerNames.append(layerName)
 
-            actionList = read_config_file(csvPath)
-            self.ini_action(actionList, layerName)
+            actionList.append(read_config_file(csvPath, [layerName]))
+    print(actionList)
+    return actionList, editableLayerNames, moveLayerNames
+
+
+def get_possible_snapFeatures(self, layerNamesList):
+    possibleSnapFeatures = []
+    bouwlaagIds = []
+    for name in layerNamesList:
+        lyr = getlayer_byname(name)
+        if name == 'BAG panden':
+            request = QgsFeatureRequest().setFilterExpression('"identificatie" = ' + self.pand_id.text())
+            tempFeature = next(lyr.getFeatures(request))
+            possibleSnapFeatures.append(tempFeature.geometry())
+        elif name == 'Bouwlagen':
+            request = QgsFeatureRequest().setFilterExpression('"pand_id" = ' + self.pand_id.text())
+            featureIt = lyr.getFeatures(request)
+            for feat in featureIt:
+                bouwlaagIds.append(feat["id"])
+                possibleSnapFeatures.append(feat.geometry())
+        elif bouwlaagIds:
+            for bid in bouwlaagIds:
+                request = QgsFeatureRequest().setFilterExpression('"bouwlaag_id" = ' + str(bid))
+                featureIt = lyr.getFeatures(request)
+                for feat in featureIt:
+                    possibleSnapFeatures.append(feat.geometry())
+    return possibleSnapFeatures

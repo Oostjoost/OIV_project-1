@@ -34,7 +34,7 @@ from qgis.gui import QgsMapToolEmitPoint
 #initialize Qt resources from file resources.py
 
 #import plugin widget and tools
-from .tools.identifyTool import IdentifyPandTool, IdentifyGeometryTool, SelectTool
+from .tools.identifyTool import IdentifyGeometryTool, SelectTool
 from .tools.utils import read_config_file, getlayer_byname, set_layer_substring
 from .tools.mapTool import CaptureTool
 from .tools.movepointTool import MovePointTool
@@ -50,26 +50,23 @@ class oiv:
 
     configFileBouwlaag = []
     configFileObject = []
-    min_bouwlaag     = -10
-    max_bouwlaag     = 30
-    check_visible    = False
-    draw_layer       = None
-    place_feature    = None
-    soort_info       = None
+    minBouwlaag = -10
+    maxBouwlaag = 30
+    checkVisibility = False
+    drawLayer = None
 
     # Save reference to the QGIS interface
     def __init__(self, iface):
-        self.iface  = iface
+        self.iface = iface
         self.canvas = self.iface.mapCanvas()
-        self.pandidentifyTool = IdentifyPandTool(self.canvas)
         self.identifyTool = IdentifyGeometryTool(self.canvas)
         self.pinTool = QgsMapToolEmitPoint(self.canvas)
-        self.tekenTool = SnapPointTool(self.canvas)
+        self.pointTool = SnapPointTool(self.canvas)
         self.selectTool = SelectTool(self.canvas)
-        self.pinLine = CaptureTool(self.canvas)        
-        self.pinPolygon = CaptureTool(self.canvas)        
-        self.moveTool = MovePointTool(self.canvas, self.draw_layer)
-        self.configFileBouwlaag = read_config_file("/config_files/csv/config_bouwlaag.csv")
+        #self.pinLine = CaptureTool(self.canvas)
+        self.drawTool = CaptureTool(self.canvas)
+        self.moveTool = MovePointTool(self.canvas, self.drawLayer)
+        self.configFileBouwlaag = read_config_file("/config_files/csv/config_bouwlaag.csv", None)
 
     def initGui(self):
         """init actions plugin"""
@@ -78,20 +75,17 @@ class oiv:
         self.action.triggered.connect(self.run)
         self.toolbar.addAction(self.action)
         self.iface.addPluginToMenu('&OIV Objecten', self.action)
-        self.settings = QAction(QIcon(":/plugins/oiv/config_files/png/settings.png"), "Settings", self.iface.mainWindow())
-        self.settings.triggered.connect(self.run_config)
-        self.iface.addPluginToMenu('&OIV Objecten', self.settings)        
         #add label to toolbar
         self.label = QLabel(self.iface.mainWindow())
         self.labelAction = self.toolbar.addWidget(self.label)
-        self.label.setText("OIV 3.0.8 | Actieve bouwlaag: ")
+        self.label.setText("OIV 3.0.9 - remaster | Actieve bouwlaag: ")
         #init dropdown to switch floors
         self.projCombo = QComboBox(self.iface.mainWindow())
-        for i in range(self.max_bouwlaag - self.min_bouwlaag + 1):
-            if self.max_bouwlaag - i != 0:
-                if self.max_bouwlaag - i == 1:
+        for i in range(self.maxBouwlaag - self.minBouwlaag + 1):
+            if self.maxBouwlaag - i != 0:
+                if self.maxBouwlaag - i == 1:
                     init_index = i
-                self.projCombo.addItem(str(self.max_bouwlaag - i))
+                self.projCombo.addItem(str(self.maxBouwlaag - i))
         self.projComboAction = self.toolbar.addWidget(self.projCombo)
         self.projCombo.setFixedWidth(100)
         self.projCombo.setMaxVisibleItems(30)
@@ -100,152 +94,128 @@ class oiv:
         #connect to set layer subset if the index is changed
         self.projCombo.currentIndexChanged.connect(self.set_layer_subset_toolbar)
         #init projectVariable to communicate from plugin to original drawing possibilities
-        project = QgsProject.instance()
-        QgsExpressionContextUtils.setProjectVariable(project, 'actieve_bouwlaag', 1)
+        QgsExpressionContextUtils.setProjectVariable(QgsProject.instance(), 'actieve_bouwlaag', 1)
 
     def close_basewidget(self):
-        #close plugin and re-activate toolbar combobox
+        """close plugin and re-activate toolbar combobox"""
         self.basewidget.close()
         self.toolbar.setEnabled(True)
         self.projCombo.setEnabled(True)
-        self.check_visible = False
+        self.checkVisibility = False
 
-    #remove the plugin menu item and remove the widgets
     def unload(self):
+        """remove the plugin menu item and remove the widgets"""
         try:
             del self.basewidget
-        except:
-            None
+        except: # pylint: disable=bare-except
+            pass
         try:
             del self.objectwidget
-        except:
-            None 
-        try:            
+        except: # pylint: disable=bare-except
+            pass
+        try:
             del self.objectnieuwwidget
-        except:
-            None 
+        except: # pylint: disable=bare-except
+            pass
         self.iface.removePluginMenu("&OIV Objecten", self.action)
-        self.iface.removePluginMenu("&OIV Objecten", self.settings)
         self.projCombo.currentIndexChanged.disconnect()
         self.action.triggered.disconnect()
-        self.settings.triggered.disconnect()
         del self.toolbar
-        self.check_visible = None
+        self.checkVisibility = None
         self.iface.removeToolBarIcon(self.action)
-
-    def run_config(self):
-        question = "Geef het wachtwoord:"
-        qid = QInputDialog()
-        password, dummy = QInputDialog.getText(qid, "Password:", question, QLineEdit.Password,)
-        if password == "01v":
-            self.configwidget = oivConfigWidget()
-            self.iface.addDockWidget(Qt.RightDockWidgetArea, self.configwidget)
-            self.configwidget.show()
-        else:
-            QMessageBox.information(None, "DEBUG:", "Verkeerd password!")
 
     def run_identify_pand(self):
         """get the identification of a building from the user"""
-        self.soort_info = 'pand'
-        self.canvas.setMapTool(self.pandidentifyTool)
-        self.pandidentifyTool.pandIdentified.connect(self.get_identified_pand)
+        self.canvas.setMapTool(self.identifyTool)
+        try:
+            self.identifyTool.geomIdentified.disconnect()
+        except: # pylint: disable=bare-except
+            pass
+        self.identifyTool.geomIdentified.connect(self.get_identified_pand)
 
     def run_identify_gebouw_terrein(self):
-        self.soort_info = 'gebouw_terrein'
-        self.canvas.setMapTool(self.pandidentifyTool)
-        self.pandidentifyTool.pandIdentified.connect(self.get_identified_gebouw_terrein)
+        """get the identification of a building from the user"""
+        self.canvas.setMapTool(self.identifyTool)
+        try:
+            self.identifyTool.geomIdentified.disconnect()
+        except: # pylint: disable=bare-except
+            pass
+        self.identifyTool.geomIdentified.connect(self.get_identified_gebouw_terrein)
 
     def get_identified_pand(self, ilayer, ifeature):
         """Return of identified layer and feature and get related object"""
-        #the identified layer must be "bouwlagen" or "BAG panden"
+        #the identified layer must be "Bouwlagen" or "BAG panden"
         if ilayer.name() == "Bouwlagen":
-            #get_draw_layer_attr -> get attribute of identified layer from the config_file: Input (layername, attributename, searchable_config_list)
             objectId = str(ifeature["pand_id"])
-            #open dockwidget object and pass along the identified object and feature
-            self.run_bouwlagen()
-            self.objectwidget.existing_object(ifeature, objectId)
-        #a new object has to be created if a BAG pand was identified objectId -> Bag identificatie nummer    
+            self.run_bouwlagen(objectId)
         elif ilayer.name() == "BAG panden":
             objectId = str(ifeature["identificatie"])
-            #open dockwidget object and pass along the identified object and feature
-            self.run_bouwlagen()
-            self.objectwidget.existing_object(ifeature, objectId)    
+            self.run_bouwlagen(objectId)
         #if another layer is identified there is no object that can be determined, so a message is send to the user
         else:
             QMessageBox.information(None, "Oeps:", "Geen pand gevonden! Klik boven op een pand.")
-        self.pandidentifyTool.pandIdentified.disconnect()
+        self.identifyTool.geomIdentified.disconnect()
 
     def get_identified_gebouw_terrein(self, ilayer, ifeature):
         """Return of identified layer and feature and get related object"""
         #the identified layer must be "Object" or "Object terrein"
-        if ilayer is not None:
+        if ilayer is None:
             self.run_new_object('wordt gekoppeld in de database', 'BGT', 'wordt gekoppeld in de database')
         elif ilayer.name() == "Objecten" or ilayer.name() == "Object terrein":
-            #get_draw_layer_attr -> get attribute of identified layer from the config_file: Input (layername, attributename, searchable_config_list)
             objectId = ifeature["id"]
-            self.draw_layer = getlayer_byname("Objecten")
-            #open dockwidget object and pass along the identified object and feature
+            self.drawLayer = getlayer_byname("Objecten")
             self.run_object()
             self.repressiefobjectwidget.existing_object(ifeature, objectId)
-            #a new object has to be created if a BAG pand was identified objectId -> Bag identificatie nummer  
-        elif ilayer.name() == "BAG panden":
-            objectId   = str(ifeature["identificatie"])
-            bron       = ifeature["bron"]
-            bron_tabel = ifeature["bron_tbl"]
-            self.run_new_object(objectId, bron, bron_tabel) 
-        elif ilayer.name() == "Bouwlagen":
-            objectId   = str(ifeature["pand_id"])
-            bron       = 'BAG'
-            bron_tabel = 'pand'
-            #open dockwidget object and pass along the identified object and feature
-            self.run_new_object(objectId, bron, bron_tabel)
+        #if another layer is identified there is no object that can be determined, so a message is send to the user
         else:
-            QMessageBox.information(None, "Oeps:", "Geen repressief object gevonden! Selecteer opnieuw.")
-        self.pandidentifyTool.pandIdentified.disconnect()
+            QMessageBox.information(None, "Oeps:", "Geen repressief object gevonden!\n \
+                                    Heeft u op een Bag Pand of een bouwlaag geklikt?\n \
+                                    Selecteer opnieuw.")
+        self.identifyTool.geomIdentified.disconnect()
 
     def set_layer_subset_toolbar(self):
         """laag filter aanpassen naar de geselecteerd bouwlaag"""
         QgsExpressionContextUtils.setProjectVariable(QgsProject.instance(), 'actieve_bouwlaag', int(self.projCombo.currentText()))
-        sub_string = "bouwlaag = " + str(self.projCombo.currentText())
-        set_layer_substring(self.configFileBouwlaag, sub_string)        
+        subString = "bouwlaag = " + str(self.projCombo.currentText())
+        set_layer_substring(self.configFileBouwlaag, subString)
 
-    def init_object_widget(self):
+    def init_object_widget(self, objectId):
         """pass on the tools to objectgegevens widget, intitializing the tools in the sub widget, draws an error"""
         #Load configuration file
         self.objectwidget = oivObjectWidget()
-        self.objectwidget.read_config = self.configFileBouwlaag
+        self.objectwidget.pand_id.setText(str(objectId))
         self.objectwidget.canvas = self.canvas
         self.objectwidget.selectTool = self.selectTool
         self.objectwidget.basewidget = self.basewidget
-        self.objectwidget.tekenTool = self.tekenTool
-        self.objectwidget.lineTool = self.pinLine
-        self.objectwidget.polygonTool = self.pinPolygon
+        self.objectwidget.tekenTool = self.pointTool
+        self.objectwidget.polygonTool = self.drawTool
         self.objectwidget.moveTool = self.moveTool
         self.objectwidget.identifyTool = self.identifyTool
 
     def init_repressief_object_widget(self):
         """pass on the tools to objectgegevens widget, intitializing the tools in the sub widget, draws an error"""
-        self.configFileObject = read_config_file("/config_files/csv/config_object.csv")
+        self.configFileObject = read_config_file("/config_files/csv/config_object.csv", None)
         self.repressiefobjectwidget = oivRepressiefObjectWidget()
         self.repressiefobjectwidget.read_config = self.configFileObject
         self.repressiefobjectwidget.canvas = self.canvas
-        self.repressiefobjectwidget.draw_layer = self.draw_layer
+        self.repressiefobjectwidget.drawLayer = self.drawLayer
         self.repressiefobjectwidget.selectTool = self.selectTool
         self.repressiefobjectwidget.basewidget = self.basewidget
-        self.repressiefobjectwidget.tekenTool = self.tekenTool
-        self.repressiefobjectwidget.lineTool = self.pinLine
-        self.repressiefobjectwidget.polygonTool = self.pinPolygon
+        self.repressiefobjectwidget.tekenTool = self.pointTool
+        self.repressiefobjectwidget.polygonTool = self.drawTool
         self.repressiefobjectwidget.moveTool = self.moveTool
         self.repressiefobjectwidget.identifyTool = self.identifyTool
         #self.repressiefobjectwidget.connect_buttons(self.configFileObject)
 
-    def run_bouwlagen(self):
+    def run_bouwlagen(self, objectId):
         """start objectgegevens widget"""
-        self.init_object_widget()
+        self.init_object_widget(objectId)
         self.iface.addDockWidget(Qt.RightDockWidgetArea, self.objectwidget)
         self.iface.actionPan().trigger()
         self.objectwidget.show()
         self.basewidget.close()
+        self.objectwidget.initUI()
+        self.objectwidget.initActions()
 
     def run_object(self):
         """start repressief object widget"""
@@ -281,8 +251,8 @@ class oiv:
             self.action.setEnabled(False)
         else:
             #always start from floor 1
-            sub_string = "bouwlaag = 1"
-            set_layer_substring(self.configFileBouwlaag, sub_string)
+            subString = "bouwlaag = 1"
+            set_layer_substring(self.configFileBouwlaag, subString)
             self.basewidget = oivBaseWidget()
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.basewidget)
             self.basewidget.identify_pand.clicked.connect(self.run_identify_pand)
@@ -291,4 +261,4 @@ class oiv:
             self.basewidget.show()
             self.toolbar.setEnabled(False)
             self.projCombo.setEnabled(False)
-            self.check_visible = True
+            self.checkVisibility = True

@@ -4,7 +4,7 @@ from qgis.PyQt.QtCore import pyqtSignal, Qt
 from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QLabel, QDialogButtonBox, QComboBox, QMessageBox
 
 from qgis.gui import QgsMapToolIdentify, QgsMapTool
-from qgis.core import QgsFeatureRequest
+from qgis.core import QgsFeatureRequest, QgsFeature
 
 from .utils import get_draw_layer_attr, getlayer_byname
 
@@ -19,11 +19,14 @@ class IdentifyGeometryTool(QgsMapToolIdentify, QgsMapTool):
 
     def canvasReleaseEvent(self, mouseEvent):
         """handle mouse release event and return indetified feature"""
+        tempfeature = QgsFeature()
         results = self.identify(mouseEvent.x(), mouseEvent.y(), self.TopDownStopAtFirst, self.VectorLayer)
         if not results == []:
             tempfeature = results[0].mFeature
             idlayer = results[0].mLayer
             self.geomIdentified.emit(idlayer, tempfeature)
+        else:
+            self.geomIdentified.emit(None, tempfeature)
 
 class SelectTool(QgsMapToolIdentify, QgsMapTool):
     """select geometry on the map"""
@@ -111,22 +114,3 @@ class AskFeatureDialog(QDialog):
         result = dialog.exec_()
         indexCombo = dialog.qComboA.currentIndex()
         return (dialog.qComboA.itemData(indexCombo), result == QDialog.Accepted)         
-
-class IdentifyPandTool(QgsMapToolIdentify, QgsMapTool):
-    """identify a object on the map"""
-    def __init__(self, canvas):
-        self.canvas = canvas
-        QgsMapToolIdentify.__init__(self, canvas)
-
-    pandIdentified = pyqtSignal(['QgsVectorLayer', 'QgsFeature'])
-
-    def canvasReleaseEvent(self, mouseEvent):
-        """handle mouse release event and return indetified feature"""
-        #tempfeature = QgsFeature()
-        results = self.identify(mouseEvent.x(), mouseEvent.y(), self.TopDownStopAtFirst, self.VectorLayer)
-        if not results == []:
-            tempfeature = results[0].mFeature
-            idlayer = results[0].mLayer
-            self.pandIdentified.emit(idlayer, tempfeature)
-        else:
-            self.pandIdentified.emit(None, tempfeature)
