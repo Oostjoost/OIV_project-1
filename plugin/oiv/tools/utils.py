@@ -55,7 +55,6 @@ def nearest_neighbor(iface, layer, point):
     extent = iface.mapCanvas().extent()
     #veroorzaakt foutmelding als er niets in het kaartvenster staat, daarom in try/except statement
     index = QgsSpatialIndex(layer.getFeatures(QgsFeatureRequest(extent)))
-    print(index)
     try:
         parentId = index.nearestNeighbor(point, 1)[0]
         parentFeature = next(layer.getFeatures(QgsFeatureRequest(parentId)))
@@ -141,21 +140,20 @@ def get_actions(configLines):
                 moveLayerNames.append(layerName)
 
             actionList.append(read_config_file(csvPath, [layerName]))
-    print(actionList)
     return actionList, editableLayerNames, moveLayerNames
 
 
-def get_possible_snapFeatures(self, layerNamesList):
+def get_possible_snapFeatures(layerNamesList, objectId):
     possibleSnapFeatures = []
     bouwlaagIds = []
     for name in layerNamesList:
         lyr = getlayer_byname(name)
         if name == 'BAG panden':
-            request = QgsFeatureRequest().setFilterExpression('"identificatie" = ' + self.pand_id.text())
+            request = QgsFeatureRequest().setFilterExpression('"identificatie" = ' + objectId)
             tempFeature = next(lyr.getFeatures(request))
             possibleSnapFeatures.append(tempFeature.geometry())
         elif name == 'Bouwlagen':
-            request = QgsFeatureRequest().setFilterExpression('"pand_id" = ' + self.pand_id.text())
+            request = QgsFeatureRequest().setFilterExpression('"pand_id" = ' + objectId)
             featureIt = lyr.getFeatures(request)
             for feat in featureIt:
                 bouwlaagIds.append(feat["id"])

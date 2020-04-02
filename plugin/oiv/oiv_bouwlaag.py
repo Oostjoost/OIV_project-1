@@ -30,7 +30,7 @@ from qgis.utils import iface
 from qgis.core import QgsFeature, QgsGeometry, QgsFeatureRequest
 
 from .tools.identifyTool import SelectTool
-from .tools.utils import getlayer_byname, get_draw_layer_attr, write_layer, set_layer_substring, user_input_label, get_possible_snapFeatures
+from .tools.utils import getlayer_byname, get_draw_layer_attr, write_layer, set_layer_substring, user_input_label, get_possible_snapFeatures, read_config_file
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'oiv_bouwlaag_widget.ui'))
@@ -41,9 +41,8 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
     canvas = None
     iface = None
     layer = None
-    read_config = None
     selectTool = None
-    polygonTool = None
+    drawTool = None
     objectId = None
     objectwidget = None
     bouwlaagList = []
@@ -54,7 +53,7 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
         super(oivBouwlaagWidget, self).__init__(parent)
         self.setupUi(self)
         self.iface = iface
-
+        self.configFileBouwlaag = read_config_file("/config_files/csv/config_bouwlaag.csv", None)
         self.bouwlaag_bag.clicked.connect(self.run_bag_overnemen)
         self.bouwlaag_tekenen.clicked.connect(self.run_bouwlaag_tekenen)
         self.bouwlaag_overnemen.clicked.connect(self.run_bouwlaag_overnemen)
@@ -109,16 +108,16 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
 
     def run_bouwlaag_tekenen(self):
         """draw a floor with the basic functionality of QGIS"""
-        possibleSnapFeatures = get_possible_snapFeatures(self.snapLayerNames)
+        possibleSnapFeatures = get_possible_snapFeatures(self.snapLayerNames, self.objectId)
         layer = getlayer_byname('Bouwlagen')
-        self.polygonTool.layer = layer
-        self.polygonTool.possibleSnapFeatures = possibleSnapFeatures
-        self.polygonTool.canvas = self.canvas
-        self.polygonTool.onGeometryAdded = self.draw_feature
-        self.polygonTool.captureMode = 2
-        self.canvas.setMapTool(self.polygonTool)
+        self.drawTool.layer = layer
+        self.drawTool.possibleSnapFeatures = possibleSnapFeatures
+        self.drawTool.canvas = self.canvas
+        self.drawTool.onGeometryAdded = self.draw_feature
+        self.drawTool.captureMode = 2
+        self.canvas.setMapTool(self.drawTool)
         self.set_lengte_oppervlakte_visibility(True, True, True)
-        self.polygonTool.parent = self
+        self.drawTool.parent = self
 
     def run_select_bouwlaag(self):
         """set selecttool as maptool"""
@@ -129,7 +128,7 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
         comboboxText = str(self.bouwlaag.currentText())
         if comboboxText != "":
             sub_string = "bouwlaag = " + str(self.bouwlaag.currentText())
-            set_layer_substring(self.read_config, sub_string)            
+            set_layer_substring(self.configFileBouwlaag, sub_string)            
 
     def copy_layers(self, parentID, newID , layer, bouwlaag):
         """select the features"""
@@ -137,10 +136,10 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
         newFeature = QgsFeature()        
         newFeature.initAttributes(fields.count())
         newFeature.setFields(fields)
-        attr_id = get_draw_layer_attr(layer.name(), "identifier", self.read_config)
-        attr_fk = get_draw_layer_attr(layer.name(), "foreign_key", self.read_config)
-        attr_label = get_draw_layer_attr(layer.name(), "input_label", self.read_config)
-        attr_rotatie = get_draw_layer_attr(layer.name(), "rotatie", self.read_config)
+        attr_id = get_draw_layer_attr(layer.name(), "identifier", self.configFileBouwlaag)
+        attr_fk = get_draw_layer_attr(layer.name(), "foreign_key", self.configFileBouwlaag)
+        attr_label = get_draw_layer_attr(layer.name(), "input_label", self.configFileBouwlaag)
+        attr_rotatie = get_draw_layer_attr(layer.name(), "rotatie", self.configFileBouwlaag)
         #get features by bouwlaag ID
         request = attr_fk + '=' + str(parentID)
         it = layer.getFeatures(QgsFeatureRequest().setFilterExpression (request))        
@@ -176,12 +175,12 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
         childFeature = QgsFeature()
         layerName = 'Bouwlagen'
         layer = getlayer_byname(layerName)
-        question = get_draw_layer_attr(layerName, "question", self.read_config)
-        label_req = get_draw_layer_attr(layerName, "label_required", self.read_config)        
+        question = get_draw_layer_attr(layerName, "question", self.configFileBouwlaag)
+        label_req = get_draw_layer_attr(layerName, "label_required", self.configFileBouwlaag)        
         #get bouwdeel from user
         input_label = user_input_label(label_req, question)
-        attr_fk    = get_draw_layer_attr(layerName, "foreign_key", self.read_config)
-        attr_label = get_draw_layer_attr(layerName, "input_label", self.read_config)
+        attr_fk    = get_draw_layer_attr(layerName, "foreign_key", self.configFileBouwlaag)
+        attr_label = get_draw_layer_attr(layerName, "input_label", self.configFileBouwlaag)
         self.iface.setActiveLayer(layer)
         #construct QgsFeature to save
         for i in range(minBouwlaag, maxBouwlaag + 1):
@@ -205,7 +204,7 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
         self.iface.actionPan().trigger()
         #set all layers substring to the right floor
         sub_string = "bouwlaag = " + str(minBouwlaag)
-        set_layer_substring(self.read_config, sub_string)
+        set_layer_substring(self.configFileBouwlaag, sub_string)
         if maxBouwlaag != minBouwlaag:
             QMessageBox.information(None, "Gereed!", "Alle bouwlagen zijn succesvol aangemaakt!")
 
@@ -219,12 +218,12 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
             maxBouwlaag = int(self.bouwlaag_max.text())
             layer = getlayer_byname(layerName)
             #get necessary attributes from config file
-            question = get_draw_layer_attr(layerName, "question", self.read_config)
-            label_req = get_draw_layer_attr(layerName, "label_required", self.read_config)
+            question = get_draw_layer_attr(layerName, "question", self.configFileBouwlaag)
+            label_req = get_draw_layer_attr(layerName, "label_required", self.configFileBouwlaag)
             #get bouwdeel from user
             input_label = user_input_label(label_req, question)
-            attr_fk = get_draw_layer_attr(layerName, "foreign_key", self.read_config)
-            attr_label = get_draw_layer_attr(layerName, "input_label", self.read_config)
+            attr_fk = get_draw_layer_attr(layerName, "foreign_key", self.configFileBouwlaag)
+            attr_label = get_draw_layer_attr(layerName, "input_label", self.configFileBouwlaag)
             self.iface.setActiveLayer(layer)
             #construct QgsFeature to save
             for i in range(minBouwlaag, maxBouwlaag + 1):
@@ -251,7 +250,7 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
             self.iface.actionPan().trigger()
             #set all layers substring to the right floor
             sub_string = "bouwlaag = " + str(minBouwlaag)
-            set_layer_substring(self.read_config, sub_string)
+            set_layer_substring(self.configFileBouwlaag, sub_string)
             try:
                 self.selectTool.geomSelected.disconnect()
             except:  # pylint: disable=bare-except

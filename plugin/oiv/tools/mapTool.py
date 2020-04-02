@@ -11,6 +11,7 @@ class CaptureTool(QgsMapTool):
     """QgsMapTool to draw lines and polygons on the map canvas"""
     CAPTURE_LINE = 1
     CAPTURE_POLYGON = 2
+    snapRubberBand = []
 
     def __init__(self, canvas):
         QgsMapTool.__init__(self, canvas)
@@ -92,18 +93,19 @@ class CaptureTool(QgsMapTool):
             self.vertexmarker.show()
 
     def snap_to_point(self, pos, layerPt):
-        """calculat if there is a point to snap to within the tolerance"""
+        """calculate if there is a point to snap to within the tolerance"""
         tolerance = pow(self.calcTolerance(pos), 2)
         self.snapPt = None
         self.snapFeature = []
         minDist = tolerance
         snapPoints = []
         counter = 0
-
+        #add rubberbands as possible snapfeatures
+        snappableFeatures = self.possibleSnapFeatures + self.snapRubberBand
         if self.vertexmarker is None:
             self.init_vertexmarker()
 
-        for geom in self.possibleSnapFeatures:
+        for geom in snappableFeatures:
             closestSegm = geom.closestSegmentWithContext(layerPt)
             vertexCoord, vertex, prevVertex, dummy, distSquared = geom.closestVertex(layerPt)
             if distSquared < minDist:
@@ -119,7 +121,6 @@ class CaptureTool(QgsMapTool):
         if snapPoints:
             snapPoint = snapPoints[0]
             igeometry = snapPoints[4]
-
             if igeometry.wkbType() == QgsWkbTypes.LineString:
                 polygon = igeometry.asPolyline()
             elif igeometry.wkbType() == QgsWkbTypes.MultiLineString:
@@ -128,12 +129,10 @@ class CaptureTool(QgsMapTool):
                 polygon = igeometry.asMultiPolygon()[0][0]
             else:
                 polygon = igeometry.asPolygon()[0]
-
             if snapPoints[1] is not None:
                 self.snapFeature.extend((snapPoints[1], snapPoints[2], polygon))
             else:
                 self.snapFeature.extend((None, None, None))
-
             return snapPoint
 
     def calcTolerance(self, pos):
@@ -251,6 +250,7 @@ class CaptureTool(QgsMapTool):
 
     def addVertex(self, canvasPoint):
         """bepaal het daadwerkelijk toe te voegen punt (snappunt of geklikt punt)"""
+        self.snapRubberBand = []
         polygon = None
         clickedPt = None
         if self.snapPt is not None:
@@ -266,7 +266,7 @@ class CaptureTool(QgsMapTool):
             self.draw_perpendicularBand(layerPt, snapAngle)
         else:
             mapPt, layerPt = self.transformCoordinates(canvasPoint)
-            if self.capturedPoints is not None:
+            if self.capturedPoints:
                 perpPt = self.capturedPoints[-1]
                 snapAngle = layerPt.azimuth(perpPt) + 90
                 self.draw_perpendicularBand(layerPt, snapAngle)
@@ -304,6 +304,7 @@ class CaptureTool(QgsMapTool):
         geom_cString = test.toCircularString()
         geom_from_curve = QgsGeometry(geom_cString)
         self.roundRubberBand.setToGeometry(geom_from_curve)
+        self.snapRubberBand.append(self.roundRubberBand.asGeometry())
 
     def draw_perpendicularBand(self, startPt, angle):
         """bereken de haakse lijnen op basis van de gesnapte feature"""
@@ -317,16 +318,13 @@ class CaptureTool(QgsMapTool):
         geom_cString = test.toCircularString()
         geom_from_curve = QgsGeometry(geom_cString)
         self.roundRubberBand.setToGeometry(geom_from_curve)
-        self.possibleSnapFeatures.append(self.roundRubberBand.asGeometry())
         self.perpRubberBand.addPoint(QgsPointXY(x1, y1))
         self.perpRubberBand.addPoint(QgsPointXY(x2, y2))
         self.perpRubberBand.show()
         #voeg de rubberband toe als mogelijke snap laag
-        self.possibleSnapFeatures.append(self.perpRubberBand.asGeometry())
+        self.snapRubberBand.append(self.perpRubberBand.asGeometry())
+        self.snapRubberBand.append(self.roundRubberBand.asGeometry())
         #als het een hoek betreft moeten er 2 haakse lijnen worden getekend
-        if self.snapFeature is None or self.snapFeature[2] is None:
-            if self.perpRubberBand2.asGeometry() in self.possibleSnapFeatures:
-                self.possibleSnapFeatures.remove(self.perpRubberBand2.asGeometry())
         try:
             if self.snapFeature[2] is not None:
                 x3 = startPt.x() + length * sin(radians(angle + 90))
@@ -338,7 +336,7 @@ class CaptureTool(QgsMapTool):
                 self.perpRubberBand2.show()
                 #voeg de rubberband toe als mogelijke snap laag
                 #self.snapLayer.append(self.perpRubberBand2)
-                self.possibleSnapFeatures.append(self.perpRubberBand.asGeometry())
+                self.snapRubberBand.append(self.perpRubberBand.asGeometry())
         except:  # pylint: disable=bare-except
             pass
 
@@ -368,11 +366,11 @@ class CaptureTool(QgsMapTool):
         #voor lijn -> minimaal 2 punten
         if self.captureMode == CaptureTool.CAPTURE_LINE:
             if len(points) < 2:
-                return None
+                self.vertexmarker.hide()
         #voor polygoon -> minimaal 3 punten
         if self.captureMode == CaptureTool.CAPTURE_POLYGON:
             if len(points) < 3:
-                return None
+                self.vertexmarker.hide()
         # Close polygon door het eerste punt ook als laatste toe te voegen
         if self.captureMode == CaptureTool.CAPTURE_POLYGON:
             points.append(points[0])

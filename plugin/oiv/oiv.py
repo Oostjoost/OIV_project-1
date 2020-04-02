@@ -188,7 +188,7 @@ class oiv:
         self.objectwidget.selectTool = self.selectTool
         self.objectwidget.basewidget = self.basewidget
         self.objectwidget.tekenTool = self.pointTool
-        self.objectwidget.polygonTool = self.drawTool
+        self.objectwidget.drawTool = self.drawTool
         self.objectwidget.moveTool = self.moveTool
         self.objectwidget.identifyTool = self.identifyTool
 

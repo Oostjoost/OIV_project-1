@@ -161,17 +161,17 @@ class oivObjectWidget(QDockWidget, FORM_CLASS):
     def run_bouwlaag(self):
         while True:
             bouwlaag, bouwlaagMax, ok = BouwlaagDialog.getBouwlagen()
-            if (bouwlaag != 0 and bouwlaagMax >= bouwlaag and ok == True):
+            if (bouwlaag != 0 and bouwlaagMax >= bouwlaag and ok is True):
                 self.close()
                 self.iface.addDockWidget(Qt.RightDockWidgetArea, self.bouwlaagwidget)
                 self.bouwlaagwidget.canvas = self.canvas
                 self.bouwlaagwidget.bouwlaagList = self.sortedList
-                self.bouwlaagwidget.configFileBouwlaag = self.configFileBouwlaag
+                #self.bouwlaagwidget.configFileBouwlaag = self.configFileBouwlaag
                 self.bouwlaagwidget.objectId = self.pand_id.text()
                 self.bouwlaagwidget.objectwidget = self
                 self.bouwlaagwidget.selectTool = self.selectTool
                 self.bouwlaagwidget.identifyTool = self.identifyTool
-                self.bouwlaagwidget.polygonTool = self.polygonTool
+                self.bouwlaagwidget.drawTool = self.drawTool
                 self.bouwlaagwidget.teken_bouwlaag.setText(str(bouwlaag) + ' t/m ' + str(bouwlaagMax))
                 self.bouwlaagwidget.bouwlaag_min.setText(str(bouwlaag))
                 self.bouwlaagwidget.bouwlaag_max.setText(str(bouwlaagMax))
