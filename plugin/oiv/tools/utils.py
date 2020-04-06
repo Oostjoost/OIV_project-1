@@ -143,7 +143,7 @@ def get_actions(configLines):
     return actionList, editableLayerNames, moveLayerNames
 
 
-def get_possible_snapFeatures(layerNamesList, objectId):
+def get_possible_snapFeatures_bouwlaag(layerNamesList, objectId):
     possibleSnapFeatures = []
     bouwlaagIds = []
     for name in layerNamesList:
@@ -161,6 +161,29 @@ def get_possible_snapFeatures(layerNamesList, objectId):
         elif bouwlaagIds:
             for bid in bouwlaagIds:
                 request = QgsFeatureRequest().setFilterExpression('"bouwlaag_id" = ' + str(bid))
+                featureIt = lyr.getFeatures(request)
+                for feat in featureIt:
+                    possibleSnapFeatures.append(feat.geometry())
+    return possibleSnapFeatures
+
+def get_possible_snapFeatures_object(layerNamesList, objectId):
+    possibleSnapFeatures = []
+    objectIds = []
+    for name in layerNamesList:
+        lyr = getlayer_byname(name)
+        if name == 'Object':
+            request = QgsFeatureRequest().setFilterExpression('"id" = ' + objectId)
+            tempFeature = next(lyr.getFeatures(request))
+            possibleSnapFeatures.append(tempFeature.geometry())
+        elif name == 'Object terrein':
+            request = QgsFeatureRequest().setFilterExpression('"id" = ' + objectId)
+            featureIt = lyr.getFeatures(request)
+            for feat in featureIt:
+                possibleSnapFeatures.append(feat.geometry())
+                objectIds.append(feat["id"])
+        elif objectIds:
+            for bid in objectIds:
+                request = QgsFeatureRequest().setFilterExpression('"object_id" = ' + str(bid))
                 featureIt = lyr.getFeatures(request)
                 for feat in featureIt:
                     possibleSnapFeatures.append(feat.geometry())

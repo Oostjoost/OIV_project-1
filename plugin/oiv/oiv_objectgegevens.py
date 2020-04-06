@@ -23,9 +23,6 @@
 import os
 import webbrowser
 
-#from . import resources
-#from .tools.identifyTool import IdentifyGeometryTool
-
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import QDialog, QDockWidget, QVBoxLayout, QLabel, QMessageBox, QComboBox, QDialogButtonBox, QPushButton
@@ -188,7 +185,7 @@ class oivObjectWidget(QDockWidget, FORM_CLASS):
     def run_tekenen(self):
         """init teken widget"""
         self.tekenwidget.canvas = self.canvas
-        self.tekenwidget.tekenTool = self.tekenTool
+        self.tekenwidget.pointTool = self.pointTool
         self.tekenwidget.drawTool = self.drawTool
         self.tekenwidget.moveTool = self.moveTool
         self.tekenwidget.selectTool = self.selectTool

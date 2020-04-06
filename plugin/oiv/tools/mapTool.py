@@ -83,7 +83,7 @@ class CaptureTool(QgsMapTool):
                 area = QgsDistanceArea()
                 a = area.measurePolygon(polygon)
                 b = area.measurePolygon(temppolygon)
-                self.parent.oppervlakte.setText(str(round(a + b,2)) + ' vierkante-meter')
+                self.parent.oppervlakte.setText(str(round(a + b, 2)) + ' vierkante-meter')
             except: # pylint: disable=bare-except
                 pass
         #laat standaard het snappunt niet zien tenzij er gesnapt kan worden

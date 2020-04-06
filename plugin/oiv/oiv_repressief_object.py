@@ -27,16 +27,12 @@ from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import QDockWidget, QMessageBox
 
-#from qgis.gui import *
 from qgis.core import QgsGeometry, QgsFeatureRequest
 from qgis.utils import iface
 
-#from . import resources
-from .tools.utils import getlayer_byname, refresh_layers
-from .tools.identifyTool import IdentifyGeometryTool
+from .tools.utils import getlayer_byname, refresh_layers, read_config_file, get_possible_snapFeatures_object
 from .oiv_stackwidget import oivStackWidget
-from .tools.mapTool import CaptureTool
-from .tools.identifyTool import SelectTool
+#from .tools.mapTool import CaptureTool
 from .oiv_object_tekenen import oivObjectTekenWidget
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
@@ -45,51 +41,37 @@ FORM_CLASS, _ = uic.loadUiType(os.path.join(
 class oivRepressiefObjectWidget(QDockWidget, FORM_CLASS):
     """interactive UI management"""
 
-    read_config = None
+    configFileObject = None
     iface = None
     canvas = None
     basewidget = None
     selectTool = None
-    tekenTool = None
+    pointTool = None
     attributeform = None
-    objectFeature = None
-    tFeature = None
-    identifyTool = None
-    draw_layer = None
+    drawLayer = None
     identifier = None
-    parentlayer_name = None
-    draw_layer_type = None
-    lineTool = None
-    polygonTool = None
+    drawTool = None
     moveTool = None
-    snapLayerNames = ["Bouwlagen", "BAG panden", "Object terrein"]
+    snapLayerNames = ["Object terrein", "Isolijnen", "Bereikbaarheid", "Sectoren"]
     tekensymbolenwidget = None
 
     def __init__(self, parent=None):
         super(oivRepressiefObjectWidget, self).__init__(parent)
         self.setupUi(self)
         self.iface = iface
-        self.object_id.setVisible(False)
+        self.configFileObject = read_config_file("/config_files/csv/config_object.csv", None)
         self.stackwidget = oivStackWidget()
+        self.tekensymbolenwidget = oivObjectTekenWidget()
+        self.set_lengte_oppervlakte_visibility(False, False, False)
+
+    def initActions(self):
+        """connect the buttons to their actions"""
         self.terug.clicked.connect(self.close_repressief_object_show_base)
         self.objectgegevens.clicked.connect(self.run_objectgegevens_bewerken)
-        self.terugmelden.clicked.connect(self.openBagviewer)
+        self.terugmelden.clicked.connect(self.open_bgt_viewer)
         self.delete_f.clicked.connect(self.run_delete)
         self.object_tekenen.clicked.connect(self.object_terrein_tekenen)
         self.object_symbolen.clicked.connect(self.run_object_symbolen_tekenen)
-        self.lengte_label.setVisible(False)
-        self.lengte.setVisible(False)
-        self.oppervlakte_label.setVisible(False)
-        self.oppervlakte.setVisible(False)
-
-    def existing_object(self, ifeature, objectId):
-        """Get the related BAG attributes from BAG API"""
-        objectId = str(ifeature["id"])
-        self.object_id.setText(str(objectId))
-        self.formelenaam.setText(ifeature["formelenaam"])
-        request = QgsFeatureRequest().setFilterExpression('"id" = ' + str(objectId))
-        tempLayer = self.draw_layer
-        self.tFeature = next(tempLayer.getFeatures(request))
 
     def close_repressief_object_show_base(self):
         """close this gui and return to the main page"""
@@ -112,34 +94,27 @@ class oivRepressiefObjectWidget(QDockWidget, FORM_CLASS):
 
     def run_objectgegevens_bewerken(self):
         """select bouwlaag on canvas to edit the atrribute form"""
+        objectId = self.object_id.text()
+        request = QgsFeatureRequest().setFilterExpression('"id" = ' + str(objectId))
+        tempLayer = self.drawLayer
+        objectFeature = next(tempLayer.getFeatures(request))
         self.iface.addDockWidget(Qt.RightDockWidgetArea, self.stackwidget)
         self.stackwidget.parentWidget = self
-        self.stackwidget.open_feature_form(self.draw_layer, self.tFeature)
+        self.stackwidget.open_feature_form(tempLayer, objectFeature)
         self.close()
         self.stackwidget.show()
 
-    def openBagviewer(self):
-        """open url based on BAG pand_id, i.v.m. terugmelden"""
+    def open_bgt_viewer(self):
+        """open url based on BGT location, i.v.m. terugmelden"""
         e = iface.mapCanvas().extent()
         gemx = (e.xMaximum() + e.xMinimum())/2
         gemy = (e.yMaximum() + e.yMinimum())/2
         url2 = 'https://verbeterdekaart.kadaster.nl/#?geometry.x=' + str(gemx) + '&geometry.y=' + str(gemy) + '&zoomlevel=12'
         webbrowser.open(url2)
 
-    def read_config_file(self, file):
-        """Read lines from input file and convert to list"""
-        config_list = []
-        basepath = os.path.dirname(os.path.realpath(__file__))
-        with open(basepath + file, 'r' ) as inp_file:
-            lines = inp_file.read().splitlines()
-        for line in lines:
-            config_list.append(line.split(','))
-        inp_file.close()
-        return config_list
-
     def run_delete(self):
         """delete repressief object"""
-        ilayer = self.draw_layer
+        ilayer = self.drawLayer
         self.iface.setActiveLayer(ilayer)
         objectId = self.object_id.text()
         request = QgsFeatureRequest().setFilterExpression('"id" = ' + str(objectId))
@@ -147,7 +122,8 @@ class oivRepressiefObjectWidget(QDockWidget, FORM_CLASS):
         ilayer.startEditing()
         ilayer.selectByIds([ifeature.id()])
         reply = QMessageBox.question(self.iface.mainWindow(), 'Continue?',
-                                     "Weet u zeker dat u de geselecteerde feature wilt weggooien?", QMessageBox.Yes, QMessageBox.No)
+                                     "Weet u zeker dat u de geselecteerde feature wilt weggooien?",\
+                                     QMessageBox.Yes, QMessageBox.No)
         if reply == QMessageBox.No:
             #als "nee" deselecteer alle geselecteerde features
             ilayer.selectByIds([])
@@ -168,55 +144,48 @@ class oivRepressiefObjectWidget(QDockWidget, FORM_CLASS):
         self.stackwidget.show()
         self.selectTool.geomSelected.disconnect(self.edit_attribute)
 
+    def set_lengte_oppervlakte_visibility(self, lengteTF, straalTF, oppTF):
+        self.lengte_label.setVisible(lengteTF)
+        self.lengte.setVisible(lengteTF)
+        self.straal.setVisible(straalTF)
+        self.straal_label.setVisible(straalTF)
+        self.oppervlakte_label.setVisible(oppTF)
+        self.oppervlakte.setVisible(oppTF)
+
     def object_terrein_tekenen(self):
         """draw repressief object terrain"""
-        snapLayer = []
-        self.lengte_label.setVisible(True)
-        self.lengte.setVisible(True)
-        self.oppervlakte_label.setVisible(True)
-        self.oppervlakte.setVisible(True)
-        self.polygonTool.parent = self
-        for name in self.snapLayerNames:
-            lyr = getlayer_byname(name)
-            snapLayer.append(lyr)
-        self.polygonTool.layer = self.draw_layer
-        self.polygonTool.snapLayer = snapLayer
-        self.polygonTool.canvas = self.canvas
-        self.polygonTool.onGeometryAdded = self.place_object_terrein
-        self.polygonTool.captureMode = 2
-        self.canvas.setMapTool(self.polygonTool)
+        objectId = self.object_id.text()
+        possibleSnapFeatures = get_possible_snapFeatures_object(self.snapLayerNames, objectId)
+        self.drawTool.parent = self
+        self.drawTool.layer = self.drawLayer
+        self.set_lengte_oppervlakte_visibility(True, True, True)
+        self.drawTool.possibleSnapFeatures = possibleSnapFeatures
+        self.drawTool.canvas = self.canvas
+        self.drawTool.onGeometryAdded = self.place_object_terrein
+        self.drawTool.captureMode = 2
+        self.canvas.setMapTool(self.drawTool)
 
-    def place_object_terrein(self, point): 
+    def place_object_terrein(self, point, dummy):
         """save drawn terrain"""
         layer = getlayer_byname("Object terrein")
         self.iface.setActiveLayer(layer)
         objectId = int(self.object_id.text())
-        iterator = self.draw_layer.getFeatures(QgsFeatureRequest().setFilterFid(objectId))
+        iterator = self.drawLayer.getFeatures(QgsFeatureRequest().setFilterFid(objectId))
         feature = next(iterator)
         layer.dataProvider().changeGeometryValues({feature.id(): QgsGeometry.fromPolygonXY([point])})
         layer.commitChanges()
         layer.triggerRepaint()
         self.activatePan()
 
-    def init_object_symbolen_tekenen(self):
-        """init draw symbols and pass through variables"""
-        self.tekensymbolenwidget = oivObjectTekenWidget()        
-        self.tekensymbolenwidget.read_config = self.read_config
+    def run_object_symbolen_tekenen(self):
         self.tekensymbolenwidget.canvas = self.canvas
         self.tekensymbolenwidget.selectTool = self.selectTool
-        self.tekensymbolenwidget.basewidget = self.basewidget
-        self.tekensymbolenwidget.tekenTool = self.tekenTool
-        self.tekensymbolenwidget.lineTool = self.lineTool
-        self.tekensymbolenwidget.polygonTool = self.polygonTool
+        self.tekensymbolenwidget.pointTool = self.pointTool
+        self.tekensymbolenwidget.drawTool = self.drawTool
         self.tekensymbolenwidget.moveTool = self.moveTool
-        self.tekensymbolenwidget.identifyTool = self.identifyTool
         self.tekensymbolenwidget.repressiefobjectwidget = self
         self.tekensymbolenwidget.formelenaam.setText(self.formelenaam.text())
         self.tekensymbolenwidget.object_id.setText(self.object_id.text())
-
-    def run_object_symbolen_tekenen(self):
-        self.init_object_symbolen_tekenen()
         self.iface.addDockWidget(Qt.RightDockWidgetArea, self.tekensymbolenwidget)
-        self.tekensymbolenwidget.connect_buttons(self.read_config)
         self.tekensymbolenwidget.show()
         self.close()

@@ -29,8 +29,9 @@ from qgis.PyQt.QtWidgets import QDockWidget, QCheckBox, QMessageBox
 from qgis.utils import iface
 from qgis.core import QgsFeature, QgsGeometry, QgsFeatureRequest
 
-from .tools.identifyTool import SelectTool
-from .tools.utils import getlayer_byname, get_draw_layer_attr, write_layer, set_layer_substring, user_input_label, get_possible_snapFeatures, read_config_file
+#from .tools.identifyTool import SelectTool
+from .tools.utils import getlayer_byname, get_draw_layer_attr, write_layer, set_layer_substring, user_input_label
+from .tools.utils import get_possible_snapFeatures_bouwlaag, read_config_file
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'oiv_bouwlaag_widget.ui'))
@@ -108,7 +109,7 @@ class oivBouwlaagWidget(QDockWidget, FORM_CLASS):
 
     def run_bouwlaag_tekenen(self):
         """draw a floor with the basic functionality of QGIS"""
-        possibleSnapFeatures = get_possible_snapFeatures(self.snapLayerNames, self.objectId)
+        possibleSnapFeatures = get_possible_snapFeatures_bouwlaag(self.snapLayerNames, self.objectId)
         layer = getlayer_byname('Bouwlagen')
         self.drawTool.layer = layer
         self.drawTool.possibleSnapFeatures = possibleSnapFeatures

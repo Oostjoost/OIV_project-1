@@ -26,74 +26,72 @@ from qgis.PyQt import uic
 from qgis.PyQt.QtWidgets import QDockWidget, QPushButton, QMessageBox
 from qgis.PyQt.QtCore import Qt
 
-from qgis.core import QgsFeatureRequest, QgsGeometry, QgsFeature
+from qgis.core import QgsFeature, QgsGeometry
 from qgis.utils import iface
 
-from .tools.utils import getlayer_byname, get_draw_layer_attr, check_layer_type, write_layer, user_input_label, nearest_neighbor, read_config_file
-from .tools.identifyTool import IdentifyGeometryTool
-
+#from .tools.mapTool import CaptureTool
+#from .tools.identifyTool import SelectTool
+#from .tools.snappointTool import SnapPointTool
+from .tools.utils import check_layer_type, get_draw_layer_attr, getlayer_byname, write_layer, user_input_label, nearest_neighbor
+from .tools.utils import read_config_file, get_actions, get_possible_snapFeatures_object
 from .oiv_stackwidget import oivStackWidget
-from .tools.mapTool import CaptureTool
-from .tools.identifyTool import SelectTool
-#from . import resources
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'oiv_object_teken_widget.ui'))
 
 class oivObjectTekenWidget(QDockWidget, FORM_CLASS):
 
-    read_config     = None
+    configFileObject = None
     repressiefobjectwidget = None
-    iface           = None
-    canvas          = None
-    basewidget      = None
-    selectTool      = None
-    tekenTool       = None
-    sortedList      = []
-    attributeform   = None
-    objectFeature   = None
-    identifyTool    = None
-    draw_layer      = None
-    identifier      = None
-    tFeature = None
-    parentlayer_name = None
-    draw_layer_type = None
-    editable_layers = []
-    lineTool        = None
-    polygonTool     = None
-    moveTool        = None
-    snappicto       = ['32', '47', '148', '150', '152', 'Algemeen', 'Voorzichtig', 'Waarschuwing', 'Gevaar'] #id van pictogram
-    moveLayerNames  = []
-    snapLayerNames  = ["Bouwlagen", "BAG panden", "Object terrein", "Sectoren", "Bereikbaarheid"]
+    iface = None
+    canvas = None
+    selectTool = None
+    pointTool = None
+    drawLayer = None
+    identifier = None
+    parentLayerName = None
+    drawLayerType = None
+    editableLayerNames = []
+    drawTool = None
+    moveTool = None
+    snapPicto = ['32', '47', '148', '150', '152', 'Algemeen', 'Voorzichtig', 'Waarschuwing', 'Gevaar'] #id van pictogram
+    moveLayerNames = []
+    snapLayerNames = ["Object terrein", "Isolijnen", "Bereikbaarheid", "Sectoren"]
 
     def __init__(self, parent=None):
         super(oivObjectTekenWidget, self).__init__(parent)
         self.setupUi(self)
-
         self.iface = iface
-        self.object_id.setVisible(False)
-        self.lengte_label.setVisible(False)
-        self.lengte.setVisible(False)
-        self.oppervlakte_label.setVisible(False)
-        self.oppervlakte.setVisible(False)
-        self.stackwidget = oivStackWidget()        
-        self.terug.clicked.connect(self.close_object_tekenen_show_base)
+        self.stackwidget = oivStackWidget()
+        self.configFileObject = read_config_file("/config_files/csv/config_object.csv", None)
+        self.initUI()
+
+    def initUI(self):
+        """intitiate the UI elemets on the widget"""
+        self.set_lengte_oppervlakte_visibility(False, False, False)
         self.move.clicked.connect(self.run_move_point)
         self.identify.clicked.connect(self.run_edit_tool)
         self.select.clicked.connect(self.run_select_tool)
         self.delete_f.clicked.connect(self.run_delete_tool)
         self.pan.clicked.connect(self.activatePan)
+        self.terug.clicked.connect(self.close_object_tekenen_show_base)
+        actionList, self.editableLayerNames, self.moveLayerNames = get_actions(self.configFileObject)
+        self.initActions(actionList)
 
-    def existing_object(self, ifeature, objectId):
-        #Get the related BAG attributes from BAG API
-        #self.formelenaam.setText(ifeature["formelenaam"]) 
-        objectId = str(ifeature["id"])
-        self.object_id.setText(str(objectId))
-        self.formelenaam.setText(ifeature["formelenaam"])
-        layerName = "Objecten"
-        request = QgsFeatureRequest().setFilterExpression('"id" = ' + str(objectId))
-        tempLayer = getlayer_byname(layerName)
-        self.tFeature = next(tempLayer.getFeatures(request))
+    def initActions(self, actionList):
+        """connect all the buttons to the action"""
+        for lyr in actionList:
+            for action in lyr:
+                runLayerName = action[0]
+                buttonNr = action[1]
+                buttonName = str(action[2].lower())
+                strButton = self.findChild(QPushButton, buttonName)
+
+                if strButton:
+                    #set tooltip per buttonn
+                    strButton.setToolTip(buttonName)
+                    #geef met de signal ook mee welke knop er is geklikt -> nr
+                    strButton.clicked.connect(lambda dummy='dummyvar', rlayer=runLayerName, who=buttonNr: self.run_tekenen(dummy, rlayer, who))
 
     def close_object_tekenen_show_base(self):
         self.move.clicked.disconnect()
@@ -109,25 +107,6 @@ class oivObjectTekenWidget(QDockWidget, FORM_CLASS):
         self.close()
         self.repressiefobjectwidget.show()
         del self
-
-    #connect button and signals to the real action run
-    def connect_buttons(self, configLines):
-        """connect button and signals to the real action run"""
-        #skip first line because of header
-        for line in configLines[1:]:
-            layerName = line[0]
-            csvPath = line[1]
-
-            if csvPath:
-                self.editable_layers.append(layerName)
-                layer = getlayer_byname(layerName)
-                layerType = check_layer_type(layer)
-
-                if layerType == "Point":
-                    self.moveLayerNames.append(layerName)
-
-                actionList = read_config_file(csvPath)
-                self.ini_action(actionList, layerName)
 
     def ini_action(self, actionList, run_layer):
         """connect all the buttons to the action"""
@@ -146,7 +125,7 @@ class oivObjectTekenWidget(QDockWidget, FORM_CLASS):
         self.iface.actionPan().trigger()
 
     def run_edit_tool(self):
-        self.selectTool.read_config = self.read_config
+        self.selectTool.read_config = self.configFileObject
         self.canvas.setMapTool(self.selectTool)
         self.selectTool.geomSelected.connect(self.edit_attribute)
 
@@ -163,20 +142,21 @@ class oivObjectTekenWidget(QDockWidget, FORM_CLASS):
         self.selectTool.geomSelected.disconnect(self.select_feature)
 
     def run_delete_tool(self):
-        self.selectTool.read_config = self.read_config
+        self.selectTool.read_config = self.configFileObject
         self.canvas.setMapTool(self.selectTool)
         self.selectTool.geomSelected.connect(self.delete_feature)
 
     def delete_feature(self, ilayer, ifeature):
-        #controleer of het een feature betreft binnenn de lijst editable_layers
-        if ilayer.name() in self.editable_layers:
+        """delete a feature"""
+        if ilayer.name() in self.editableLayerNames:
             self.iface.setActiveLayer(ilayer)
             ids = []
             ids.append(ifeature.id())
             ilayer.selectByIds(ids)
             ilayer.startEditing()
-            reply = QMessageBox.question(self.iface.mainWindow(), 'Continue?', 
-                 "Weet u zeker dat u de geselecteerde feature wilt weggooien?", QMessageBox.Yes, QMessageBox.No)
+            reply = QMessageBox.question(self.iface.mainWindow(), 'Continue?',
+                                         "Weet u zeker dat u de geselecteerde feature wilt weggooien?",
+                                         QMessageBox.Yes, QMessageBox.No)
             if reply == QMessageBox.No:
                 #als "nee" deselecteer alle geselecteerde features
                 self.selectTool.geomSelected.disconnect(self.delete_feature)
@@ -188,8 +168,11 @@ class oivObjectTekenWidget(QDockWidget, FORM_CLASS):
                 self.selectTool.geomSelected.disconnect(self.delete_feature)
         #als er een feature is aangeklikt uit een andere laag, geef dan een melding
         else:
-            reply = QMessageBox.information(self.iface.mainWindow(), 'Geen tekenlaag!', 
-                 "U heeft geen feature op een tekenlaag aangeklikt!\n\nKlik a.u.b. op de juiste locatie.\n\nWeet u zeker dat u iets wilt weggooien?", QMessageBox.Yes, QMessageBox.No)
+            reply = QMessageBox.information(self.iface.mainWindow(), 'Geen tekenlaag!',
+                                            "U heeft geen feature op een tekenlaag aangeklikt!\n\n\
+                                            Klik a.u.b. op de juiste locatie.\n\n\
+                                            Weet u zeker dat u iets wilt weggooien?",
+                                            QMessageBox.Yes, QMessageBox.No)
             if reply == QMessageBox.No:
                 self.selectTool.geomSelected.disconnect(self.delete_feature)
                 ilayer.selectByIds([])
@@ -221,110 +204,96 @@ class oivObjectTekenWidget(QDockWidget, FORM_CLASS):
             moveLayer.commitChanges()        
         self.activatePan()
 
+    def set_lengte_oppervlakte_visibility(self, lengteTF, straalTF, oppTF):
+        self.lengte_label.setVisible(lengteTF)
+        self.lengte.setVisible(lengteTF)
+        self.straal.setVisible(straalTF)
+        self.straal_label.setVisible(straalTF)
+        self.oppervlakte_label.setVisible(oppTF)
+        self.oppervlakte.setVisible(oppTF)
+
     def run_tekenen(self, dummy, run_layer, feature_id):
-        snapLayer = []
         #welke pictogram is aangeklikt en wat is de bijbehorende tekenlaag
         self.identifier = feature_id
-        self.draw_layer = getlayer_byname(run_layer)
-        #betreft het een punt, lijn of polygoon laag?
-        self.draw_layer_type = check_layer_type(self.draw_layer)
-        #wat is the parentlayer, uitlezen vanuit de config file
-        self.parentlayer_name = get_draw_layer_attr(run_layer, "parent_layer", self.read_config)
-        #aan welke lagen kan worden gesnapt?
-        for name in self.snapLayerNames:
-            lyr = getlayer_byname(name)
-            snapLayer.append(lyr)
-        if self.draw_layer_type == "Point":
-            self.tekenTool.snapPt = None
-            self.tekenTool.snapping = False
-            self.tekenTool.startRotate = False
-            self.tekenTool.snapLayer = snapLayer
-            #controleren of het een pictogram betreft die gesnapt kan worden (instelling bovenin)
-            if self.identifier in self.snappicto:
-                self.tekenTool.snapping = True
-            self.tekenTool.layer = self.draw_layer
-            self.canvas.setMapTool(self.tekenTool)
-            self.lengte_label.setVisible(False)
-            self.lengte.setVisible(False)
-            self.oppervlakte_label.setVisible(False)
-            self.oppervlakte.setVisible(False)            
-            #na de mapTool terugkeren naar "place_feature"
-            self.tekenTool.onGeometryAdded = self.place_feature
-        elif self.draw_layer_type == "Line":
-            self.lineTool.layer = self.draw_layer
-            self.lineTool.snapLayer = snapLayer
-            self.lineTool.canvas = self.canvas
-            self.lineTool.onGeometryAdded = self.place_feature
-            self.lineTool.parent = self
-            self.lengte_label.setVisible(True)
-            self.lengte.setVisible(True)
-            self.lineTool.captureMode = 1
-            self.canvas.setMapTool(self.lineTool)
-            self.oppervlakte_label.setVisible(False)
-            self.oppervlakte.setVisible(False)                
-        elif self.draw_layer_type == "Polygon":
-            self.polygonTool.layer = self.draw_layer
-            self.polygonTool.snapLayer = snapLayer
-            self.polygonTool.canvas = self.canvas
-            self.polygonTool.onGeometryAdded = self.place_feature
-            self.polygonTool.parent = self
-            self.lengte_label.setVisible(True)
-            self.lengte.setVisible(True)
-            self.oppervlakte_label.setVisible(True)
-            self.oppervlakte.setVisible(True)
-            self.polygonTool.captureMode = 2
-            self.canvas.setMapTool(self.polygonTool)
+        self.drawLayer = getlayer_byname(run_layer)
+        self.drawLayerType = check_layer_type(self.drawLayer)
+        self.parentLayerName = get_draw_layer_attr(run_layer, "parent_layer", self.configFileObject)
+        objectId = self.object_id.text()
+        possibleSnapFeatures = get_possible_snapFeatures_object(self.snapLayerNames, objectId)
+        if self.drawLayerType == "Point":
+            self.pointTool.snapPt = None
+            self.pointTool.snapping = False
+            self.pointTool.startRotate = False
+            self.pointTool.possibleSnapFeatures = possibleSnapFeatures
+            if self.identifier in self.snapPicto:
+                self.pointTool.snapping = True
+            self.pointTool.layer = self.drawLayer
+            self.canvas.setMapTool(self.pointTool)
+            self.set_lengte_oppervlakte_visibility(False, False, False)
+            self.pointTool.onGeometryAdded = self.place_feature
+        else:
+            if self.drawLayerType == "Line":
+                self.drawTool.captureMode = 1
+            else:
+                self.drawTool.captureMode = 2
+            self.drawTool.layer = self.drawLayer
+            self.drawTool.possibleSnapFeatures = possibleSnapFeatures
+            self.drawTool.canvas = self.canvas
+            self.drawTool.onGeometryAdded = self.place_feature
+            self.canvas.setMapTool(self.drawTool)
+            self.set_lengte_oppervlakte_visibility(True, True, False)
+            self.drawTool.parent = self    
 
     def place_feature(self, points, snapAngle):
         childFeature = QgsFeature()
         parentId = None
         #parentFeature = QgsFeature()
-        self.iface.setActiveLayer(self.draw_layer)
+        self.iface.setActiveLayer(self.drawLayer)
         #converteer lijst van punten naar QgsGeometry, afhankelijk van soort geometrie
-        if self.draw_layer_type == "Point":
+        if self.drawLayerType == "Point":
             childFeature.setGeometry(QgsGeometry.fromPointXY(points))
             geom = points
-        elif self.draw_layer_type == "Line":
+        elif self.drawLayerType == "Line":
             childFeature.setGeometry(QgsGeometry.fromPolylineXY(points))
             geom = points[0]
-        elif self.draw_layer_type == "Polygon":
+        elif self.drawLayerType == "Polygon":
             childFeature.setGeometry(QgsGeometry.fromPolygonXY([points]))
             geom = points[0]
-        if self.parentlayer_name != '' and self.parentlayer_name == 'Objecten':
-            parentlayer = getlayer_byname(self.parentlayer_name)
+        if self.parentLayerName != '' and self.parentLayerName == 'Objecten':
+            parentlayer = getlayer_byname(self.parentLayerName)
             parentId = int(self.object_id.text())
-        elif self.parentlayer_name != '':
-            parentlayer = getlayer_byname(self.parentlayer_name)
+        elif self.parentLayerName != '':
+            parentlayer = getlayer_byname(self.parentLayerName)
             dummy, parentId = nearest_neighbor(self.iface, parentlayer, geom)
         else:
             parentId = None
         #foutafhandeling ivm als er geen parentId is
-        if parentId is None and self.parentlayer_name != '':
+        if parentId is None and self.parentLayerName != '':
             QMessageBox.information(None, "Oeps:", "Geen object gevonden om aan te koppelen.")
         else:
             #wegschrijven van de nieuwe feature, inclusief foreign_key en rotatie
             #foreignKey = next(parentlayer.getFeatures(QgsFeatureRequest(parentFeature[0].id())))
             buttonCheck = self.get_attributes(parentId, childFeature, snapAngle)
             if buttonCheck != 'Cancel':
-                write_layer(self.draw_layer, childFeature)
+                write_layer(self.drawLayer, childFeature)
         #opnieuw activeren tekentool, zodat er meerdere pictogrammen achter elkaar kunnen worden geplaatst
-        self.run_tekenen('dummy', self.draw_layer.name(), self.identifier)
+        self.run_tekenen('dummy', self.drawLayer.name(), self.identifier)
         #self.activatePan()
 
     def get_attributes(self, foreignKey, childFeature, snapAngle):
         input_id = self.identifier
         #haal de vraag voor de inputdialog vanuit de config file
-        question = get_draw_layer_attr(self.draw_layer.name(), "question", self.read_config)
+        question = get_draw_layer_attr(self.drawLayer.name(), "question", self.configFileObject)
         #is de label verplicht of niet?
-        label_req = get_draw_layer_attr(self.draw_layer.name(), "label_required", self.read_config)        
+        label_req = get_draw_layer_attr(self.drawLayer.name(), "label_required", self.configFileObject)        
         input_label = user_input_label(label_req, question)
         #attribuut naam ophalen van de foreignkey
         if input_label != 'Cancel':
             input_fk = foreignKey
-            attr_id = get_draw_layer_attr(self.draw_layer.name(), "identifier", self.read_config)
-            attr_label = get_draw_layer_attr(self.draw_layer.name(), "input_label", self.read_config)
-            attr_fk = get_draw_layer_attr(self.draw_layer.name(), "foreign_key", self.read_config)       
-            fields = self.draw_layer.fields()        
+            attr_id = get_draw_layer_attr(self.drawLayer.name(), "identifier", self.configFileObject)
+            attr_label = get_draw_layer_attr(self.drawLayer.name(), "input_label", self.configFileObject)
+            attr_fk = get_draw_layer_attr(self.drawLayer.name(), "foreign_key", self.configFileObject)       
+            fields = self.drawLayer.fields()        
             #initialiseer de childFeature
             childFeature.initAttributes(fields.count())
             childFeature.setFields(fields)

@@ -27,10 +27,11 @@ from qgis.PyQt.QtCore import Qt
 from qgis.core import QgsFeature, QgsGeometry, QgsFeatureRequest
 from qgis.utils import iface
 
-from .tools.mapTool import CaptureTool
-from .tools.identifyTool import SelectTool
-from .tools.snappointTool import SnapPointTool
-from .tools.utils import check_layer_type, get_draw_layer_attr, getlayer_byname, write_layer, user_input_label, nearest_neighbor, read_config_file, get_actions, get_possible_snapFeatures
+#from .tools.mapTool import CaptureTool
+#from .tools.identifyTool import SelectTool
+#from .tools.snappointTool import SnapPointTool
+from .tools.utils import check_layer_type, get_draw_layer_attr, getlayer_byname, write_layer, user_input_label
+from .tools.utils import nearest_neighbor, read_config_file, get_actions, get_possible_snapFeatures_bouwlaag
 from .oiv_stackwidget import oivStackWidget
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
@@ -42,7 +43,7 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
     configFileBouwlaag = None
     iface = None
     canvas = None
-    tekenTool = None
+    pointTool = None
     identifier = None
     parentLayerName = None
     drawLayerType = None
@@ -54,7 +55,7 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
     selectTool = None
     #id van pictogram
     snapPicto = ['1', '10', '32', '47', '148', '149', '150', '151', '152',\
-                 '1011', 'Algemeen', 'Voorzichtig', 'Waarschuwing', 'Gevaar'] 
+                 '1011', 'Algemeen', 'Voorzichtig', 'Waarschuwing', 'Gevaar']
     moveLayerNames = []
     snapLayerNames = ["BAG panden", "Bouwlagen", \
                         "Bouwkundige veiligheidsvoorzieningen", "Ruimten"]
@@ -65,6 +66,7 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         self.setupUi(self)
         self.iface = iface
         self.stackwidget = oivStackWidget()
+        self.configFileBouwlaag = read_config_file("/config_files/csv/config_bouwlaag.csv", None)
         self.initUI()
 
     def initUI(self):
@@ -77,7 +79,6 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         self.delete_f.clicked.connect(self.run_delete_tool)
         self.pan.clicked.connect(self.activatePan)
         self.terug.clicked.connect(self.close_teken_show_object)
-        self.configFileBouwlaag = read_config_file("/config_files/csv/config_bouwlaag.csv", None)        
         actionList, self.editableLayerNames, self.moveLayerNames = get_actions(self.configFileBouwlaag)
         self.initActions(actionList)
 
@@ -161,8 +162,10 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         #als er een feature is aangeklikt uit een andere laag, geef dan een melding
         else:
             reply = QMessageBox.information(self.iface.mainWindow(), 'Geen tekenlaag!',
-                                            "U heeft geen feature op een tekenlaag aangeklikt!\n\nKlik a.u.b. op de juiste locatie.\n\n\
-                                            Weet u zeker dat u iets wilt weggooien?", QMessageBox.Yes, QMessageBox.No)
+                                            "U heeft geen feature op een tekenlaag aangeklikt!\n\n\
+                                            Klik a.u.b. op de juiste locatie.\n\n\
+                                            Weet u zeker dat u iets wilt weggooien?",\
+                                            QMessageBox.Yes, QMessageBox.No)
             if reply == QMessageBox.No:
                 self.selectTool.geomSelected.disconnect(self.delete_feature)
                 ilayer.selectByIds([])
@@ -212,7 +215,7 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         self.parentLayerName = get_draw_layer_attr(run_layer, "parent_layer", self.configFileBouwlaag)
         objectId = self.pand_id.text()
         #aan welke lagen kan worden gesnapt?
-        possibleSnapFeatures = get_possible_snapFeatures(self.snapLayerNames, objectId)
+        possibleSnapFeatures = get_possible_snapFeatures_bouwlaag(self.snapLayerNames, objectId)
 
         if self.drawLayerType == "Point":
             self.tekenTool.snapPt = None

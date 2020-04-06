@@ -63,7 +63,8 @@ class oiv:
         self.pinTool = QgsMapToolEmitPoint(self.canvas)
         self.pointTool = SnapPointTool(self.canvas)
         self.selectTool = SelectTool(self.canvas)
-        #self.pinLine = CaptureTool(self.canvas)
+        self.basewidget = oivBaseWidget()
+        self.repressiefobjectwidget = oivRepressiefObjectWidget()
         self.drawTool = CaptureTool(self.canvas)
         self.moveTool = MovePointTool(self.canvas, self.drawLayer)
         self.configFileBouwlaag = read_config_file("/config_files/csv/config_bouwlaag.csv", None)
@@ -160,16 +161,15 @@ class oiv:
         """Return of identified layer and feature and get related object"""
         #the identified layer must be "Object" or "Object terrein"
         if ilayer is None:
-            self.run_new_object('wordt gekoppeld in de database', 'BGT', 'wordt gekoppeld in de database')
+            self.run_new_object(ifeature, 'wordt gekoppeld in de database', 'BGT', 'wordt gekoppeld in de database')
         elif ilayer.name() == "Objecten" or ilayer.name() == "Object terrein":
             objectId = ifeature["id"]
             self.drawLayer = getlayer_byname("Objecten")
-            self.run_object()
-            self.repressiefobjectwidget.existing_object(ifeature, objectId)
+            self.run_object(ifeature, objectId)
         #if another layer is identified there is no object that can be determined, so a message is send to the user
         else:
-            QMessageBox.information(None, "Oeps:", "Geen repressief object gevonden!\n \
-                                    Heeft u op een Bag Pand of een bouwlaag geklikt?\n \
+            QMessageBox.information(None, "Oeps:", "Geen repressief object gevonden!\n\
+                                    Heeft u op een Terrein of een object geklikt?\n\
                                     Selecteer opnieuw.")
         self.identifyTool.geomIdentified.disconnect()
 
@@ -187,25 +187,23 @@ class oiv:
         self.objectwidget.canvas = self.canvas
         self.objectwidget.selectTool = self.selectTool
         self.objectwidget.basewidget = self.basewidget
-        self.objectwidget.tekenTool = self.pointTool
+        self.objectwidget.pointTool = self.pointTool
         self.objectwidget.drawTool = self.drawTool
         self.objectwidget.moveTool = self.moveTool
         self.objectwidget.identifyTool = self.identifyTool
 
-    def init_repressief_object_widget(self):
+    def init_repressief_object_widget(self, ifeature, objectId):
         """pass on the tools to objectgegevens widget, intitializing the tools in the sub widget, draws an error"""
-        self.configFileObject = read_config_file("/config_files/csv/config_object.csv", None)
-        self.repressiefobjectwidget = oivRepressiefObjectWidget()
-        self.repressiefobjectwidget.read_config = self.configFileObject
+        self.repressiefobjectwidget.object_id.setText(str(objectId))
+        self.repressiefobjectwidget.formelenaam.setText(ifeature["formelenaam"])
         self.repressiefobjectwidget.canvas = self.canvas
         self.repressiefobjectwidget.drawLayer = self.drawLayer
         self.repressiefobjectwidget.selectTool = self.selectTool
         self.repressiefobjectwidget.basewidget = self.basewidget
-        self.repressiefobjectwidget.tekenTool = self.pointTool
-        self.repressiefobjectwidget.polygonTool = self.drawTool
+        self.repressiefobjectwidget.pointTool = self.pointTool
+        self.repressiefobjectwidget.drawTool = self.drawTool
         self.repressiefobjectwidget.moveTool = self.moveTool
         self.repressiefobjectwidget.identifyTool = self.identifyTool
-        #self.repressiefobjectwidget.connect_buttons(self.configFileObject)
 
     def run_bouwlagen(self, objectId):
         """start objectgegevens widget"""
@@ -217,17 +215,18 @@ class oiv:
         self.objectwidget.initUI()
         self.objectwidget.initActions()
 
-    def run_object(self):
+    def run_object(self, ifeature, objectId):
         """start repressief object widget"""
-        self.init_repressief_object_widget()
+        self.init_repressief_object_widget(ifeature, objectId)
         self.iface.addDockWidget(Qt.RightDockWidgetArea, self.repressiefobjectwidget)
         self.iface.actionPan().trigger()
         self.repressiefobjectwidget.show()
         self.basewidget.close()
+        self.repressiefobjectwidget.initActions()
 
-    def run_new_object(self, objectId, bron, bron_tbl):
+    def run_new_object(self, ifeature, objectId, bron, bron_tbl):
         """tart new object widget, eventhough passing trough the tools to objectgegevens widget"""
-        self.init_repressief_object_widget()
+        self.init_repressief_object_widget(ifeature, objectId)
         self.objectnieuwwidget = oivObjectNieuwWidget()
         self.objectnieuwwidget.basewidget = self.basewidget
         self.objectnieuwwidget.objectwidget = self.repressiefobjectwidget
@@ -253,7 +252,6 @@ class oiv:
             #always start from floor 1
             subString = "bouwlaag = 1"
             set_layer_substring(self.configFileBouwlaag, subString)
-            self.basewidget = oivBaseWidget()
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.basewidget)
             self.basewidget.identify_pand.clicked.connect(self.run_identify_pand)
             self.basewidget.identify_gebouw.clicked.connect(self.run_identify_gebouw_terrein)
