@@ -39,15 +39,15 @@ class MovePointTool(QgsMapToolIdentify):
             if found_features is not None and type_check == "Point":
                 self.dragging = True
                 #init drag point
-                self.vertexmarker.setColor(QColor(0, 0, 255))
-                self.vertexmarker.setIconSize(5)
-                self.vertexmarker.setIconType(QgsVertexMarker.ICON_X)
-                self.vertexmarker.setPenWidth(3)
-                self.vertexmarker.show()
+                self.vertexMarker.setColor(QColor(0, 0, 255))
+                self.vertexMarker.setIconSize(5)
+                self.vertexMarker.setIconType(QgsVertexMarker.ICON_X)
+                self.vertexMarker.setPenWidth(3)
+                self.vertexMarker.show()
             #anders doe niets
             else:
                 self.dragging = False
-                self.fid  = None
+                self.fid = None
         #indien de rechtermuisknop wordt geklikt -> roteren
         if event.button() == Qt.RightButton:
             if found_features is not None and type_check == "Point":
@@ -75,7 +75,7 @@ class MovePointTool(QgsMapToolIdentify):
         if self.dragging:
             mapPt, layerPt = self.transformCoordinates(event.pos())
             self.point = layerPt
-            self.vertexmarker.setCenter(mapPt)
+            self.vertexMarker.setCenter(mapPt)
         #als roteren -> teken de tempRubberband als lijn
         if self.startRotate:
             mapPt, layerPt = self.transformCoordinates(event.pos())
@@ -89,7 +89,7 @@ class MovePointTool(QgsMapToolIdentify):
     def canvasReleaseEvent(self, event):
         """als verslepen -> pas de geometry van de betreffende feature aan"""
         if self.dragging:
-            self.vertexmarker.hide()
+            self.vertexMarker.hide()
             geom = QgsGeometry.fromPointXY(self.point)
             self.idlayer.dataProvider().changeGeometryValues({self.fid : geom})
             self.idlayer.commitChanges()

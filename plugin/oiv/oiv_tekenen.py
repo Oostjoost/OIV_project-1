@@ -47,10 +47,9 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
     parentLayerName = None
     drawLayerType = None
     drawLayer = None
-    editableLayers = []
+    editableLayerNames = []
     objectwidget = None
-    lineTool = None
-    polygonTool = None
+    drawTool = None
     moveTool = None
     selectTool = None
     #id van pictogram
@@ -141,7 +140,7 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
 
     def delete_feature(self, ilayer, ifeature):
         """controleer of het een feature betreft binnenn de lijst editableLayers"""
-        if ilayer.name() in self.editableLayers:
+        if ilayer.name() in self.editableLayerNames:
             self.iface.setActiveLayer(ilayer)
             ids = []
             ids.append(ifeature.id())
@@ -161,7 +160,7 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
                 self.run_delete_tool()
         #als er een feature is aangeklikt uit een andere laag, geef dan een melding
         else:
-            reply = QMessageBox.information(self.iface.mainWindow(), 'Geen tekenlaag!', 
+            reply = QMessageBox.information(self.iface.mainWindow(), 'Geen tekenlaag!',
                                             "U heeft geen feature op een tekenlaag aangeklikt!\n\nKlik a.u.b. op de juiste locatie.\n\n\
                                             Weet u zeker dat u iets wilt weggooien?", QMessageBox.Yes, QMessageBox.No)
             if reply == QMessageBox.No:
@@ -211,8 +210,9 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
         self.drawLayer = getlayer_byname(run_layer)
         self.drawLayerType = check_layer_type(self.drawLayer)
         self.parentLayerName = get_draw_layer_attr(run_layer, "parent_layer", self.configFileBouwlaag)
+        objectId = self.pand_id.text()
         #aan welke lagen kan worden gesnapt?
-        possibleSnapFeatures = get_possible_snapFeatures(self.snapLayerNames)
+        possibleSnapFeatures = get_possible_snapFeatures(self.snapLayerNames, objectId)
 
         if self.drawLayerType == "Point":
             self.tekenTool.snapPt = None
@@ -225,29 +225,23 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
             self.canvas.setMapTool(self.tekenTool)
             self.set_lengte_oppervlakte_visibility(False, False, False)
             self.tekenTool.onGeometryAdded = self.place_feature
-        elif self.drawLayerType == "Line":
-            self.lineTool.layer = self.drawLayer
-            self.lineTool.possibleSnapFeatures = possibleSnapFeatures
-            self.lineTool.canvas = self.canvas
-            self.lineTool.onGeometryAdded = self.place_feature
-            self.lineTool.captureMode = 1
-            self.canvas.setMapTool(self.lineTool)
+        else:
+            if self.drawLayerType == "Line":
+                self.drawTool.captureMode = 1
+            else:
+                self.drawTool.captureMode = 2
+            self.drawTool.layer = self.drawLayer
+            self.drawTool.possibleSnapFeatures = possibleSnapFeatures
+            self.drawTool.canvas = self.canvas
+            self.drawTool.onGeometryAdded = self.place_feature
+            self.canvas.setMapTool(self.drawTool)
             self.set_lengte_oppervlakte_visibility(True, True, False)
-            self.lineTool.parent = self
-        elif self.drawLayerType == "Polygon":
-            self.polygonTool.layer = self.drawLayer
-            self.polygonTool.possibleSnapFeatures = possibleSnapFeatures
-            self.polygonTool.canvas = self.canvas
-            self.polygonTool.onGeometryAdded = self.place_feature
-            self.polygonTool.captureMode = 2
-            self.canvas.setMapTool(self.polygonTool)
-            self.set_lengte_oppervlakte_visibility(True, True, True)
-            self.polygonTool.parent = self
+            self.drawTool.parent = self
 
     def place_feature(self, points, snapAngle):
         """Save and place feature on the canvas"""
         childFeature = QgsFeature()
-        self.iface.setActiveLayer(self.draw_layer)
+        self.iface.setActiveLayer(self.drawLayer)
         #converteer lijst van punten naar QgsGeometry, afhankelijk van soort geometrie
         if self.drawLayerType == "Point":
             childFeature.setGeometry(QgsGeometry.fromPointXY(points))
@@ -268,26 +262,25 @@ class oivTekenWidget(QDockWidget, FORM_CLASS):
             #wegschrijven van de nieuwe feature, inclusief foreign_key en rotatie
             buttonCheck = self.get_attributes(parentId, childFeature, snapAngle)
             if buttonCheck != 'Cancel':
-                write_layer(self.draw_layer, childFeature)
+                write_layer(self.drawLayer, childFeature)
         #opnieuw activeren tekentool, zodat er meerdere pictogrammen achter elkaar kunnen worden geplaatst
-        self.run_tekenen('dummy', self.draw_layer.name(), self.identifier)
-        #self.activatePan()
+        self.run_tekenen('dummy', self.drawLayer.name(), self.identifier)
 
     def get_attributes(self, foreignKey, childFeature, snapAngle):
         """get the aatributes that are obligated"""
         input_id = self.identifier
         #haal de vraag voor de inputdialog vanuit de config file
-        question = get_draw_layer_attr(self.draw_layer.name(), "question", self.configFileBouwlaag)
+        question = get_draw_layer_attr(self.drawLayer.name(), "question", self.configFileBouwlaag)
         #is de label verplicht of niet?
-        label_req = get_draw_layer_attr(self.draw_layer.name(), "label_required", self.configFileBouwlaag)
+        label_req = get_draw_layer_attr(self.drawLayer.name(), "label_required", self.configFileBouwlaag)
         input_label = user_input_label(label_req, question)
         #attribuut naam ophalen van de foreignkey
         if input_label != 'Cancel':
             input_fk = foreignKey
-            attr_id = get_draw_layer_attr(self.draw_layer.name(), "identifier", self.configFileBouwlaag)
-            attr_label = get_draw_layer_attr(self.draw_layer.name(), "input_label", self.configFileBouwlaag)
-            attr_fk = get_draw_layer_attr(self.draw_layer.name(), "foreign_key", self.configFileBouwlaag)
-            fields = self.draw_layer.fields()
+            attr_id = get_draw_layer_attr(self.drawLayer.name(), "identifier", self.configFileBouwlaag)
+            attr_label = get_draw_layer_attr(self.drawLayer.name(), "input_label", self.configFileBouwlaag)
+            attr_fk = get_draw_layer_attr(self.drawLayer.name(), "foreign_key", self.configFileBouwlaag)
+            fields = self.drawLayer.fields()
             #initialiseer de childFeature
             childFeature.initAttributes(fields.count())
             childFeature.setFields(fields)

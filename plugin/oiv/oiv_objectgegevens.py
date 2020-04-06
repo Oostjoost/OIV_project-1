@@ -189,8 +189,7 @@ class oivObjectWidget(QDockWidget, FORM_CLASS):
         """init teken widget"""
         self.tekenwidget.canvas = self.canvas
         self.tekenwidget.tekenTool = self.tekenTool
-        self.tekenwidget.lineTool = self.lineTool
-        self.tekenwidget.polygonTool = self.polygonTool
+        self.tekenwidget.drawTool = self.drawTool
         self.tekenwidget.moveTool = self.moveTool
         self.tekenwidget.selectTool = self.selectTool
         self.tekenwidget.objectwidget = self
